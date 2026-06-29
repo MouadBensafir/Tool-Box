@@ -20,25 +20,27 @@ _TH_STYLE = (
     "background-color:#000000;"
     "color:#ffffff;"
     "font-weight:bold;"
-    "padding:8px 12px;"
+    "padding:4px 6px;"
     "border:1px solid #000000;"
-    "text-align:left;"
-    "white-space:nowrap;"
+    "text-align:center;"
+    "font-family:Arial,sans-serif;"
+    "font-size:11px;"
 )
 
 _TD_STYLE = (
     "color:#000000;"
-    "padding:8px 12px;"
-    "border:1px solid #cccccc;"
+    "font-weight:bold;"
+    "padding:4px 6px;"
+    "border:1px solid #000000;"
     "background-color:#ffffff;"
-    "white-space:nowrap;"
+    "text-align:center;"
+    "font-family:Arial,sans-serif;"
+    "font-size:11px;"
 )
 
 _TABLE_STYLE = (
     "border-collapse:collapse;"
     "width:100%;"
-    "font-family:Arial,sans-serif;"
-    "font-size:13px;"
 )
 
 
@@ -84,12 +86,14 @@ def _safe(value: Any) -> str:
 
 _BLACK_FILL = PatternFill(start_color="000000", end_color="000000", fill_type="solid")
 _WHITE_BOLD_FONT = Font(color="FFFFFF", bold=True, name="Arial", size=11)
-_BLACK_FONT = Font(color="000000", name="Arial", size=11)
+_BLACK_BOLD_FONT = Font(color="000000", bold=True, name="Arial", size=11)
 
 _THIN_SIDE = Side(style="thin", color="000000")
 _CELL_BORDER = Border(
     left=_THIN_SIDE, right=_THIN_SIDE, top=_THIN_SIDE, bottom=_THIN_SIDE
 )
+
+_CENTER = Alignment(horizontal="center", vertical="center", wrap_text=False)
 
 
 def build_excel_bytes(data: List[Dict[str, Any]], sheet_name: str = "Rapport") -> bytes:
@@ -111,15 +115,15 @@ def build_excel_bytes(data: List[Dict[str, Any]], sheet_name: str = "Rapport") -
         cell.fill = _BLACK_FILL
         cell.font = _WHITE_BOLD_FONT
         cell.border = _CELL_BORDER
-        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=False)
+        cell.alignment = _CENTER
 
     # ── Data rows ───────────────────────────────
     for row_idx, row in enumerate(data, start=2):
         for col_idx, header in enumerate(headers, start=1):
             cell = ws.cell(row=row_idx, column=col_idx, value=row.get(header))
-            cell.font = _BLACK_FONT
+            cell.font = _BLACK_BOLD_FONT
             cell.border = _CELL_BORDER
-            cell.alignment = Alignment(vertical="center")
+            cell.alignment = _CENTER
 
     # ── Auto-fit column widths ──────────────────
     for col in ws.columns:
