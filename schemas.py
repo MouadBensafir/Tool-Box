@@ -47,12 +47,14 @@ class EmailRequest(BaseModel):
     to_email: str
     cc_email: Optional[str] = None
     subject: str
-    # HTML body — must contain {{TABLE}} where the generated table will be injected
+    # HTML body — must contain __TABLE__ where the generated table will be injected
     body: str
     # Array of flat objects; all objects must share the same keys
     table_data: List[Dict[str, Any]]
     # ETAT GPS only: name of the date column used to highlight rows ≠ today
     date_field: Optional[str] = "Date"
+    # Override the default attachment filename (must end in .xlsx)
+    filename: Optional[str] = None
 
 
 class SendEmailResponse(BaseModel):

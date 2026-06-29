@@ -75,7 +75,7 @@ async def _send(req: EmailRequest, case_slug: str) -> SendEmailResponse:
 
     html_body = req.body.replace(PLACEHOLDER, build_html_table(req.table_data))
     excel_bytes = build_excel_bytes(req.table_data, sheet_name=case_slug)
-    filename = f"{case_slug.replace('-', '_')}.xlsx"
+    filename = req.filename or f"{case_slug.replace('-', '_')}.xlsx"
 
     try:
         gmail_id = await send_email(
@@ -115,7 +115,7 @@ async def etat_gps(req: EmailRequest) -> SendEmailResponse:
             subject=req.subject,
             html_body=html_body,
             excel_bytes=excel_bytes,
-            filename="etat_gps.xlsx",
+            filename=req.filename or "etat_gps.xlsx",
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
