@@ -25,11 +25,12 @@ from schemas import (
     AttachmentRequest,
     AttachmentResponse,
     EmailRequest,
+    EventMapEmailRequest,
     MapRenderRequest,
     MapRenderResponse,
     SendEmailResponse,
 )
-from services.gmail_client import fetch_attachment_as_excel_json, send_email
+from services.gmail_client import fetch_attachment_as_excel_json, send_email, send_email_with_map
 from services.map_renderer import render_event_map
 from services.table_builder import (
     build_excel_bytes,
@@ -170,7 +171,53 @@ async def parse_attachment(req: AttachmentRequest) -> AttachmentResponse:
 
 
 # ──────────────────────────────────────────────────────────────
-# Map rendering endpoint
+# Map rendering + email endpoint
+# ──────────────────────────────────────────────────────────────
+
+@app.post("/evenement-map", response_model=SendEmailResponse, tags=["Email"])
+async def evenement_map(req: EventMapEmailRequest) -> SendEmailResponse:
+    """
+    Render a satellite map for the given event and send it embedded in an email.
+
+    The 'body' field must contain __MAP__ where the image should appear, e.g.:
+      <p>Bonjour,</p><p>Carte de l'événement :</p>__MAP__
+    """
+    PLACEHOLDER = "__MAP__"
+    if PLACEHOLDER not in req.body:
+        raise HTTPException(
+            status_code=422,
+            detail="Field 'body' must contain the placeholder __MAP__.",
+        )
+
+    try:
+        png_bytes = await render_event_map(
+            trajectory=req.trajectory,
+            event=req.event.model_dump(),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Map render failed: {exc}") from exc
+
+    img_tag = '<img src="cid:event_map" style="max-width:100%;border:1px solid #ddd;" />'
+    html_body = req.body.replace(PLACEHOLDER, img_tag)
+
+    try:
+        gmail_id = await send_email_with_map(
+            to_email=req.to_email,
+            cc_email=req.cc_email,
+            subject=req.subject,
+            html_body=html_body,
+            png_bytes=png_bytes,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return SendEmailResponse(gmail_message_id=gmail_id)
+
+
+# ──────────────────────────────────────────────────────────────
+# Map rendering (raw PNG) endpoint
 # ──────────────────────────────────────────────────────────────
 
 @app.post(

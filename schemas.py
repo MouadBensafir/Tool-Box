@@ -29,6 +29,18 @@ class MapRenderResponse(BaseModel):
     image_b64: str
 
 
+# ── Map + Email (combined) ─────────────────────────────────────────────────────
+
+class EventMapEmailRequest(BaseModel):
+    to_email: str
+    cc_email: Optional[str] = None
+    subject: str
+    # HTML body — must contain __MAP__ where the satellite image will be injected
+    body: str
+    trajectory: List[List[float]]
+    event: EventInfo
+
+
 # ── Email ──────────────────────────────────────────────────────────────────────
 
 class EmailRequest(BaseModel):

@@ -21,6 +21,7 @@ import base64
 import io
 import os
 from email.mime.base import MIMEBase
+from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email import encoders
@@ -171,6 +172,57 @@ def _build_mime_message(
     msg.attach(part)
 
     return msg
+
+
+async def send_email_with_map(
+    to_email: str,
+    cc_email: Optional[str],
+    subject: str,
+    html_body: str,
+    png_bytes: bytes,
+) -> str:
+    """
+    Send an HTML email with a satellite map PNG embedded inline (CID attachment).
+    The html_body must already contain <img src="cid:event_map"> where the image
+    should appear — call this after replacing the __MAP__ placeholder.
+
+    :returns: The Gmail message ID of the sent message.
+    """
+    access_token = await _get_access_token()
+
+    # multipart/mixed
+    #   └── multipart/related  (ties the HTML to its inline image)
+    #         ├── text/html
+    #         └── image/png    (Content-ID: <event_map>)
+    outer = MIMEMultipart("mixed")
+    outer["To"] = to_email
+    if cc_email:
+        outer["Cc"] = cc_email
+    outer["Subject"] = subject
+
+    related = MIMEMultipart("related")
+
+    html_part = MIMEText(html_body, "html", "utf-8")
+    related.attach(html_part)
+
+    img_part = MIMEImage(png_bytes, "png")
+    img_part.add_header("Content-ID", "<event_map>")
+    img_part.add_header("Content-Disposition", "inline", filename="event_map.png")
+    related.attach(img_part)
+
+    outer.attach(related)
+
+    raw = base64.urlsafe_b64encode(outer.as_bytes()).decode("utf-8")
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(
+            GMAIL_SEND_URL,
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={"raw": raw},
+        )
+        resp.raise_for_status()
+
+    return resp.json().get("id", "")
 
 
 async def send_email(

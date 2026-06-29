@@ -132,7 +132,11 @@ async def render_event_map(
     )
 
     async with async_playwright() as pw:
-        browser = await pw.chromium.launch()
+        browser = await pw.chromium.launch(args=[
+            "--no-sandbox",           # required when running as root in containers
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",  # /dev/shm is small in Railway containers
+        ])
         page = await browser.new_page(
             viewport={"width": _MAP_WIDTH, "height": _MAP_HEIGHT}
         )
