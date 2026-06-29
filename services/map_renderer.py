@@ -37,7 +37,7 @@ _HTML_TEMPLATE = """\
     * { box-sizing: border-box; margin: 0; padding: 0; }
     #map { width: MAP_WIDTHpx; height: MAP_HEIGHTpx; }
 
-    /* Popup — compact, matching MiX Telematics style */
+    /* Popup — compact, MiX Telematics style */
     .pb {
       font-family: Arial, sans-serif;
       font-size: 11px;
@@ -59,58 +59,87 @@ _HTML_TEMPLATE = """\
       white-space: nowrap;
       vertical-align: top;
     }
-    .pb .pv {
-      color: #222;
-      padding: 1px 0;
-      vertical-align: top;
-    }
-
-    /* Alarm triangle icon */
-    .alarm-icon svg { display: block; }
+    .pb .pv { color: #222; padding: 1px 0; vertical-align: top; }
   </style>
 </head>
 <body>
 <div id="map"></div>
 <script>
+  var PINK       = '#d43089';
   var TILE_URL   = INJECT_TILE_URL;
   var CENTER     = INJECT_CENTER;
   var TRAJECTORY = INJECT_TRAJECTORY;
   var POPUP_HTML = INJECT_POPUP_HTML;
 
+  /* Map centered on the event */
   var map = L.map('map', { zoomControl: true, attributionControl: false })
              .setView(CENTER, 15);
 
   L.tileLayer(TILE_URL, { maxZoom: 20 }).addTo(map);
 
-  /* Pink trajectory polyline */
+  /* Trajectory polyline */
   if (TRAJECTORY.length > 0) {
-    L.polyline(TRAJECTORY, { color: '#e91e8c', weight: 6, opacity: 1 })
-     .addTo(map);
+    L.polyline(TRAJECTORY, { color: PINK, weight: 6, opacity: 1 }).addTo(map);
   }
 
-  /* Alarm triangle marker — replicates MiX event icon */
+  /* White circle markers at every recorded position */
+  TRAJECTORY.forEach(function(pt) {
+    L.circleMarker(pt, {
+      radius:      5,
+      fillColor:   '#ffffff',
+      fillOpacity: 1,
+      color:       PINK,
+      weight:      2.5
+    }).addTo(map);
+  });
+
+  /* Directional arrows along each segment (bearing-aware) */
+  function bearing(a, b) {
+    var lat1 = a[0] * Math.PI / 180, lat2 = b[0] * Math.PI / 180;
+    var dLng = (b[1] - a[1]) * Math.PI / 180;
+    return Math.atan2(
+      Math.sin(dLng) * Math.cos(lat2),
+      Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng)
+    ) * 180 / Math.PI;
+  }
+
+  for (var i = 0; i < TRAJECTORY.length - 1; i++) {
+    var p1 = TRAJECTORY[i], p2 = TRAJECTORY[i + 1];
+    var mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+    var angle = bearing(p1, p2);
+    /* Arrow tip points up in SVG; rotate by bearing to align with road direction */
+    L.marker(mid, {
+      icon: L.divIcon({
+        className: '',
+        html: '<svg width="14" height="14" viewBox="0 0 14 14"'
+            + '  xmlns="http://www.w3.org/2000/svg"'
+            + '  style="display:block;transform:rotate(' + angle + 'deg)">'
+            + '<path d="M7,1 L13,13 L7,9 L1,13 Z" fill="' + PINK + '"/>'
+            + '</svg>',
+        iconSize:   [14, 14],
+        iconAnchor: [7, 7]
+      }),
+      interactive: false
+    }).addTo(map);
+  }
+
+  /* Alarm triangle icon — pink, MiX style */
   var alarmIcon = L.divIcon({
-    className: 'alarm-icon',
+    className: '',
     html: '<svg width="26" height="26" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg">'
-        + '<polygon points="13,2 24,23 2,23" fill="#e53935" stroke="#fff" stroke-width="1.5"/>'
+        + '<polygon points="13,2 24,23 2,23" fill="' + PINK + '" stroke="#fff" stroke-width="1.5"/>'
         + '<text x="13" y="21" text-anchor="middle" font-size="13" font-weight="bold"'
         + '  fill="white" font-family="Arial,sans-serif">!</text>'
         + '</svg>',
     iconSize:    [26, 26],
     iconAnchor:  [13, 23],
-    popupAnchor: [0, -24]
+    popupAnchor: [0, -26]
   });
 
   L.marker(CENTER, { icon: alarmIcon })
    .addTo(map)
    .bindPopup(POPUP_HTML, { maxWidth: 280, closeButton: false, autoClose: false })
    .openPopup();
-
-  /* Auto-fit map to show the full trajectory + event point */
-  var allPoints = TRAJECTORY.concat([CENTER]);
-  if (allPoints.length > 1) {
-    map.fitBounds(L.latLngBounds(allPoints), { padding: [60, 60] });
-  }
 </script>
 </body>
 </html>
