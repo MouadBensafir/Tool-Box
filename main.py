@@ -4,6 +4,7 @@ OBC Email Microservice
 FastAPI service responsible for:
   1. Building and sending emails (HTML body + Excel attachment) via Gmail API.
   2. Parsing an Excel file fetched from Gmail and returning it as JSON.
+  3. Rendering a satellite map PNG with a vehicle trajectory and event popup.
 
 Endpoints
 ---------
@@ -12,13 +13,24 @@ POST /demarrage-tardif       → SendEmailResponse
 POST /analyse-evenement-hos  → SendEmailResponse
 POST /survitesse             → SendEmailResponse
 POST /parse-attachment       → AttachmentResponse
+POST /render-event-map       → MapRenderResponse
 """
+
+import base64
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from schemas import AttachmentRequest, AttachmentResponse, EmailRequest, SendEmailResponse
+from schemas import (
+    AttachmentRequest,
+    AttachmentResponse,
+    EmailRequest,
+    MapRenderRequest,
+    MapRenderResponse,
+    SendEmailResponse,
+)
 from services.gmail_client import fetch_attachment_as_excel_json, send_email
+from services.map_renderer import render_event_map
 from services.table_builder import (
     build_excel_bytes,
     build_excel_bytes_etat_gps,
@@ -155,6 +167,37 @@ async def parse_attachment(req: AttachmentRequest) -> AttachmentResponse:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     return AttachmentResponse(data=data)
+
+
+# ──────────────────────────────────────────────────────────────
+# Map rendering endpoint
+# ──────────────────────────────────────────────────────────────
+
+@app.post(
+    "/render-event-map",
+    response_model=MapRenderResponse,
+    summary="Render a satellite map PNG with a vehicle trajectory and event popup",
+    tags=["Map"],
+)
+async def render_map(req: MapRenderRequest) -> MapRenderResponse:
+    """
+    Generates a 760×500 PNG showing:
+    - Satellite tile background (ESRI World Imagery by default, override via MAP_TILE_URL env var)
+    - Vehicle trajectory as a pink polyline
+    - Event popup card at the specified coordinates
+
+    The returned base64 string can be embedded directly in an HTML email body:
+      <img src="data:image/png;base64,{image_b64}" />
+    """
+    try:
+        png_bytes = await render_event_map(
+            trajectory=req.trajectory,
+            event=req.event.model_dump(),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return MapRenderResponse(image_b64=base64.b64encode(png_bytes).decode())
 
 
 # ──────────────────────────────────────────────────────────────

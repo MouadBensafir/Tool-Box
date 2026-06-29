@@ -2,6 +2,35 @@ from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
 
 
+# ── Map rendering ──────────────────────────────────────────────────────────────
+
+class EventInfo(BaseModel):
+    lat: float
+    lng: float
+    event_name: str = ""
+    driver: str = ""
+    driver_id: str = ""
+    asset: str = ""
+    asset_id: str = ""
+    start_time: str = ""
+    end_time: str = ""
+    duration: str = ""
+    location_name: str = ""
+
+
+class MapRenderRequest(BaseModel):
+    # Ordered list of [lat, lng] pairs representing the vehicle trajectory
+    trajectory: List[List[float]]
+    event: EventInfo
+
+
+class MapRenderResponse(BaseModel):
+    # Base64-encoded PNG — embed in HTML as: <img src="data:image/png;base64,{image_b64}">
+    image_b64: str
+
+
+# ── Email ──────────────────────────────────────────────────────────────────────
+
 class EmailRequest(BaseModel):
     to_email: str
     cc_email: Optional[str] = None
