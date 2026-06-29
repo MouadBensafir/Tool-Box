@@ -21,7 +21,6 @@ _DEFAULT_TILE_URL = (
 
 _MAP_WIDTH = 760
 _MAP_HEIGHT = 500
-_ZOOM = 17
 
 # ── HTML template ──────────────────────────────────────────────────────────────
 # Dynamic values are injected as JS variables to avoid f-string / brace conflicts.
@@ -37,19 +36,37 @@ _HTML_TEMPLATE = """\
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     #map { width: MAP_WIDTHpx; height: MAP_HEIGHTpx; }
-    .pb { font-family: Arial, sans-serif; font-size: 12px; min-width: 220px; }
+
+    /* Popup — compact, matching MiX Telematics style */
+    .pb {
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      min-width: 190px;
+      max-width: 260px;
+    }
     .pb-title {
-      font-weight: bold; font-size: 13px;
-      margin-bottom: 5px; padding-bottom: 4px;
-      border-bottom: 1px solid #ccc;
+      font-weight: bold;
+      font-size: 12px;
+      margin-bottom: 4px;
+      padding-bottom: 3px;
+      border-bottom: 1px solid #ddd;
     }
     .pb table { border-collapse: collapse; width: 100%; }
     .pb .pk {
-      color: #555; font-weight: bold;
-      padding: 1px 10px 1px 0;
-      white-space: nowrap; vertical-align: top;
+      font-weight: bold;
+      color: #222;
+      padding: 1px 8px 1px 0;
+      white-space: nowrap;
+      vertical-align: top;
     }
-    .pb .pv { color: #111; padding: 1px 0; vertical-align: top; }
+    .pb .pv {
+      color: #222;
+      padding: 1px 0;
+      vertical-align: top;
+    }
+
+    /* Alarm triangle icon */
+    .alarm-icon svg { display: block; }
   </style>
 </head>
 <body>
@@ -57,24 +74,43 @@ _HTML_TEMPLATE = """\
 <script>
   var TILE_URL   = INJECT_TILE_URL;
   var CENTER     = INJECT_CENTER;
-  var ZOOM       = INJECT_ZOOM;
   var TRAJECTORY = INJECT_TRAJECTORY;
   var POPUP_HTML = INJECT_POPUP_HTML;
 
   var map = L.map('map', { zoomControl: true, attributionControl: false })
-             .setView(CENTER, ZOOM);
+             .setView(CENTER, 15);
 
   L.tileLayer(TILE_URL, { maxZoom: 20 }).addTo(map);
 
-  if (TRAJECTORY.length > 1) {
-    L.polyline(TRAJECTORY, { color: '#e91e8c', weight: 5, opacity: 0.9 })
+  /* Pink trajectory polyline */
+  if (TRAJECTORY.length > 0) {
+    L.polyline(TRAJECTORY, { color: '#e91e8c', weight: 6, opacity: 1 })
      .addTo(map);
   }
 
-  L.popup({ maxWidth: 320, closeButton: false, autoClose: false })
-   .setLatLng(CENTER)
-   .setContent(POPUP_HTML)
-   .addTo(map);
+  /* Alarm triangle marker — replicates MiX event icon */
+  var alarmIcon = L.divIcon({
+    className: 'alarm-icon',
+    html: '<svg width="26" height="26" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg">'
+        + '<polygon points="13,2 24,23 2,23" fill="#e53935" stroke="#fff" stroke-width="1.5"/>'
+        + '<text x="13" y="21" text-anchor="middle" font-size="13" font-weight="bold"'
+        + '  fill="white" font-family="Arial,sans-serif">!</text>'
+        + '</svg>',
+    iconSize:    [26, 26],
+    iconAnchor:  [13, 23],
+    popupAnchor: [0, -24]
+  });
+
+  L.marker(CENTER, { icon: alarmIcon })
+   .addTo(map)
+   .bindPopup(POPUP_HTML, { maxWidth: 280, closeButton: false, autoClose: false })
+   .openPopup();
+
+  /* Auto-fit map to show the full trajectory + event point */
+  var allPoints = TRAJECTORY.concat([CENTER]);
+  if (allPoints.length > 1) {
+    map.fitBounds(L.latLngBounds(allPoints), { padding: [60, 60] });
+  }
 </script>
 </body>
 </html>
@@ -82,17 +118,17 @@ _HTML_TEMPLATE = """\
 
 
 def _build_popup_html(event: Dict[str, Any]) -> str:
-    """Build the inner HTML for the event popup card."""
+    """Build the inner HTML for the event popup card (MiX Telematics style)."""
     fields = [
-        ("Event name",    event.get("event_name", "")),
-        ("Driver",        event.get("driver", "")),
-        ("Driver ID",     event.get("driver_id", "")),
-        ("Asset",         event.get("asset", "")),
-        ("Asset ID",      event.get("asset_id", "")),
-        ("Start time",    event.get("start_time", "")),
-        ("End time",      event.get("end_time", "")),
-        ("Duration",      event.get("duration", "")),
-        ("Location name", event.get("location_name", "")),
+        ("Event name:",    event.get("event_name", "")),
+        ("Driver:",        event.get("driver", "")),
+        ("Driver ID:",     event.get("driver_id", "")),
+        ("Asset:",         event.get("asset", "")),
+        ("Asset ID:",      event.get("asset_id", "")),
+        ("Start time:",    event.get("start_time", "")),
+        ("End time:",      event.get("end_time", "")),
+        ("Duration:",      event.get("duration", "")),
+        ("Location name:", event.get("location_name", "")),
     ]
     rows = "".join(
         f'<tr><td class="pk">{k}</td><td class="pv">{v}</td></tr>'
@@ -126,7 +162,6 @@ async def render_event_map(
         .replace("MAP_HEIGHT",        str(_MAP_HEIGHT))
         .replace("INJECT_TILE_URL",   json.dumps(tile_url))
         .replace("INJECT_CENTER",     json.dumps(center))
-        .replace("INJECT_ZOOM",       str(_ZOOM))
         .replace("INJECT_TRAJECTORY", json.dumps(trajectory))
         .replace("INJECT_POPUP_HTML", json.dumps(popup_html))
     )
