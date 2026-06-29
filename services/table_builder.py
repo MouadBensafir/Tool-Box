@@ -72,8 +72,8 @@ _STD_TH = f"background-color:#000000;color:#ffffff;font-weight:bold;{_CELL_BASE}
 _STD_TD = f"background-color:#ffffff;color:#000000;{_CELL_BASE}"
 
 _BLACK_FILL      = PatternFill(start_color="000000", end_color="000000", fill_type="solid")
-_WHITE_BOLD_FONT = Font(color="FFFFFF", bold=True,  name="Arial", size=13)
-_BLACK_FONT      = Font(color="000000", bold=False, name="Arial", size=12)
+_WHITE_BOLD_FONT = Font(color="FFFFFF", bold=True,  name="Arial", size=18)
+_BLACK_FONT      = Font(color="000000", bold=False, name="Arial", size=15)
 
 
 def build_html_table(data: List[Dict[str, Any]]) -> str:
@@ -115,7 +115,7 @@ _GPS_YELLOW = f"background-color:#ffff00;color:#000000;{_CELL_BASE}"
 _GRAY_FILL   = PatternFill(start_color="A6A6A6", end_color="A6A6A6", fill_type="solid")
 _YELLOW_FILL = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 _WHITE_FILL  = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
-_BLACK_BOLD_FONT = Font(color="000000", bold=True, name="Arial", size=13)
+_BLACK_BOLD_FONT = Font(color="000000", bold=True, name="Arial", size=18)
 
 
 def build_html_table_etat_gps(data: List[Dict[str, Any]], date_field: str = "Date") -> str:
