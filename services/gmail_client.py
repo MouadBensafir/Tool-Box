@@ -1,5 +1,5 @@
 """
-Gmail attachment fetcher + Excel → JSON parser.
+Gmail client — send emails and fetch/parse attachments.
 
 Auth flow
 ---------
@@ -12,22 +12,25 @@ Credentials are read from environment variables:
   GMAIL_CLIENT_SECRET
   GMAIL_REFRESH_TOKEN
 
-Gmail API endpoint used:
-  GET https://gmail.googleapis.com/gmail/v1/users/me/messages/{messageId}/attachments/{attachmentId}
-
-The API returns a base64url-encoded payload; we decode it, load it as an
-.xlsx workbook, and return the first sheet as a list of flat dicts.
+Required OAuth2 scopes on the refresh token:
+  https://www.googleapis.com/auth/gmail.send
+  https://www.googleapis.com/auth/gmail.readonly
 """
 
 import base64
 import io
 import os
-from typing import Any, Dict, List
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email import encoders
+from typing import Any, Dict, List, Optional
 
 import httpx
 import openpyxl
 
 GMAIL_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
 GMAIL_ATTACHMENT_URL = (
     "https://gmail.googleapis.com/gmail/v1/users/me"
     "/messages/{message_id}/attachments/{attachment_id}"
@@ -133,3 +136,70 @@ def _parse_excel(excel_bytes: bytes) -> List[Dict[str, Any]]:
             )
 
     return result
+
+
+# ─────────────────────────────────────────────
+# Email sending
+# ─────────────────────────────────────────────
+
+def _build_mime_message(
+    to_email: str,
+    cc_email: Optional[str],
+    subject: str,
+    html_body: str,
+    excel_bytes: bytes,
+    filename: str,
+) -> MIMEMultipart:
+    """Construct a MIME multipart message with an HTML body and Excel attachment."""
+    msg = MIMEMultipart("mixed")
+    msg["To"] = to_email
+    if cc_email:
+        msg["Cc"] = cc_email
+    msg["Subject"] = subject
+
+    # HTML body
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+    # Excel attachment
+    part = MIMEBase(
+        "application",
+        "vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    part.set_payload(excel_bytes)
+    encoders.encode_base64(part)
+    part.add_header("Content-Disposition", f'attachment; filename="{filename}"')
+    msg.attach(part)
+
+    return msg
+
+
+async def send_email(
+    to_email: str,
+    cc_email: Optional[str],
+    subject: str,
+    html_body: str,
+    excel_bytes: bytes,
+    filename: str,
+) -> str:
+    """
+    Send an email with an Excel attachment via the Gmail API.
+
+    :returns: The Gmail message ID of the sent message.
+    :raises httpx.HTTPStatusError: on non-2xx from Gmail.
+    """
+    access_token = await _get_access_token()
+
+    msg = _build_mime_message(to_email, cc_email, subject, html_body, excel_bytes, filename)
+
+    # Gmail API expects the raw MIME message encoded as base64url
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(
+            GMAIL_SEND_URL,
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={"raw": raw},
+        )
+        resp.raise_for_status()
+
+    return resp.json().get("id", "")

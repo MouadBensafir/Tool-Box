@@ -12,18 +12,9 @@ class EmailRequest(BaseModel):
     table_data: List[Dict[str, Any]]
 
 
-class ExcelAttachment(BaseModel):
-    filename: str
-    content_base64: str
-    mime_type: str = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-
-class EmailResponse(BaseModel):
-    to_email: str
-    cc_email: Optional[str]
-    subject: str
-    html_body: str
-    excel_attachment: ExcelAttachment
+class SendEmailResponse(BaseModel):
+    status: str = "sent"
+    gmail_message_id: str
 
 
 class AttachmentRequest(BaseModel):

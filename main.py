@@ -2,28 +2,23 @@
 OBC Email Microservice
 ======================
 FastAPI service responsible for:
-  1. Generating HTML email bodies (with embedded table) + Excel attachments.
+  1. Building and sending emails (HTML body + Excel attachment) via Gmail API.
   2. Parsing an Excel file fetched from Gmail and returning it as JSON.
-
-Fusion AI handles data collection, filtering, and actual email sending.
-This service only constructs the payloads.
 
 Endpoints
 ---------
-POST /etat-gps               → EmailResponse
-POST /demarrage-tardif       → EmailResponse
-POST /analyse-evenement-hos  → EmailResponse
-POST /survitesse             → EmailResponse
+POST /etat-gps               → SendEmailResponse
+POST /demarrage-tardif       → SendEmailResponse
+POST /analyse-evenement-hos  → SendEmailResponse
+POST /survitesse             → SendEmailResponse
 POST /parse-attachment       → AttachmentResponse
 """
-
-import base64
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from schemas import AttachmentRequest, AttachmentResponse, EmailRequest, EmailResponse, ExcelAttachment
-from services.gmail_client import fetch_attachment_as_excel_json
+from schemas import AttachmentRequest, AttachmentResponse, EmailRequest, SendEmailResponse
+from services.gmail_client import fetch_attachment_as_excel_json, send_email
 from services.table_builder import build_excel_bytes, build_html_table
 
 # ──────────────────────────────────────────────────────────────
@@ -51,83 +46,58 @@ app.add_middleware(
 # Shared helper
 # ──────────────────────────────────────────────────────────────
 
-def _build_response(req: EmailRequest, case_slug: str) -> EmailResponse:
-    """
-    Core logic shared by all email-generation endpoints.
-
-    :param req: Incoming request with table_data and email metadata.
-    :param case_slug: Used as the Excel sheet name and filename prefix.
-    :returns: Fully constructed EmailResponse.
-    """
-    html_table = build_html_table(req.table_data)
-
-    # Inject the table into the caller-supplied HTML body
+async def _send(req: EmailRequest, case_slug: str) -> SendEmailResponse:
+    """Build and send the email. Shared by all four case endpoints."""
     PLACEHOLDER = "__TABLE__"
     if PLACEHOLDER not in req.body:
         raise HTTPException(
             status_code=422,
             detail="Field 'body' must contain the placeholder __TABLE__.",
         )
-    html_body = req.body.replace(PLACEHOLDER, html_table)
 
+    html_body = req.body.replace(PLACEHOLDER, build_html_table(req.table_data))
     excel_bytes = build_excel_bytes(req.table_data, sheet_name=case_slug)
-    excel_b64 = base64.b64encode(excel_bytes).decode("utf-8")
     filename = f"{case_slug.replace('-', '_')}.xlsx"
 
-    return EmailResponse(
-        to_email=req.to_email,
-        cc_email=req.cc_email,
-        subject=req.subject,
-        html_body=html_body,
-        excel_attachment=ExcelAttachment(
+    try:
+        gmail_id = await send_email(
+            to_email=req.to_email,
+            cc_email=req.cc_email,
+            subject=req.subject,
+            html_body=html_body,
+            excel_bytes=excel_bytes,
             filename=filename,
-            content_base64=excel_b64,
-        ),
-    )
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return SendEmailResponse(gmail_message_id=gmail_id)
 
 
 # ──────────────────────────────────────────────────────────────
 # Email generation endpoints
 # ──────────────────────────────────────────────────────────────
 
-@app.post(
-    "/etat-gps",
-    response_model=EmailResponse,
-    summary="Generate ETAT GPS email + Excel attachment",
-    tags=["Email Generation"],
-)
-async def etat_gps(req: EmailRequest) -> EmailResponse:
-    return _build_response(req, "etat-gps")
+@app.post("/etat-gps", response_model=SendEmailResponse, tags=["Email"])
+async def etat_gps(req: EmailRequest) -> SendEmailResponse:
+    return await _send(req, "etat-gps")
 
 
-@app.post(
-    "/demarrage-tardif",
-    response_model=EmailResponse,
-    summary="Generate DEMARRAGE TARDIF email + Excel attachment",
-    tags=["Email Generation"],
-)
-async def demarrage_tardif(req: EmailRequest) -> EmailResponse:
-    return _build_response(req, "demarrage-tardif")
+@app.post("/demarrage-tardif", response_model=SendEmailResponse, tags=["Email"])
+async def demarrage_tardif(req: EmailRequest) -> SendEmailResponse:
+    return await _send(req, "demarrage-tardif")
 
 
-@app.post(
-    "/analyse-evenement-hos",
-    response_model=EmailResponse,
-    summary="Generate ANALYSE EVENEMENT HOS email + Excel attachment",
-    tags=["Email Generation"],
-)
-async def analyse_evenement_hos(req: EmailRequest) -> EmailResponse:
-    return _build_response(req, "analyse-evenement-hos")
+@app.post("/analyse-evenement-hos", response_model=SendEmailResponse, tags=["Email"])
+async def analyse_evenement_hos(req: EmailRequest) -> SendEmailResponse:
+    return await _send(req, "analyse-evenement-hos")
 
 
-@app.post(
-    "/survitesse",
-    response_model=EmailResponse,
-    summary="Generate SURVITESSE email + Excel attachment",
-    tags=["Email Generation"],
-)
-async def survitesse(req: EmailRequest) -> EmailResponse:
-    return _build_response(req, "survitesse")
+@app.post("/survitesse", response_model=SendEmailResponse, tags=["Email"])
+async def survitesse(req: EmailRequest) -> SendEmailResponse:
+    return await _send(req, "survitesse")
 
 
 # ──────────────────────────────────────────────────────────────
