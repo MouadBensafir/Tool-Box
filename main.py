@@ -9,10 +9,11 @@ FastAPI service responsible for:
 Endpoints
 ---------
 POST /etat-gps               → SendEmailResponse
-POST /demarrage-tardif       → SendEmailResponse
+POST /demarrage-tardif       → SendEmailResponse  (two tables, two Excel attachments)
 POST /analyse-evenement-hos  → SendEmailResponse
 POST /survitesse             → SendEmailResponse
 POST /parse-attachment       → AttachmentResponse
+POST /evenement-map          → SendEmailResponse
 POST /render-event-map       → MapRenderResponse
 """
 
@@ -61,11 +62,11 @@ app.add_middleware(
 
 
 # ──────────────────────────────────────────────────────────────
-# Shared helper
+# Shared helper — single table
 # ──────────────────────────────────────────────────────────────
 
 async def _send(req: EmailRequest, case_slug: str) -> SendEmailResponse:
-    """Build and send the email. Shared by all four case endpoints."""
+    """Build and send the email for single-table endpoints."""
     PLACEHOLDER = "__TABLE__"
     if PLACEHOLDER not in req.body:
         raise HTTPException(
@@ -83,8 +84,7 @@ async def _send(req: EmailRequest, case_slug: str) -> SendEmailResponse:
             cc_email=req.cc_email,
             subject=req.subject,
             html_body=html_body,
-            excel_bytes=excel_bytes,
-            filename=filename,
+            attachments=[(excel_bytes, filename)],
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -114,8 +114,7 @@ async def etat_gps(req: EmailRequest) -> SendEmailResponse:
             cc_email=req.cc_email,
             subject=req.subject,
             html_body=html_body,
-            excel_bytes=excel_bytes,
-            filename=req.filename or "etat_gps.xlsx",
+            attachments=[(excel_bytes, req.filename or "etat_gps.xlsx")],
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -127,7 +126,43 @@ async def etat_gps(req: EmailRequest) -> SendEmailResponse:
 
 @app.post("/demarrage-tardif", response_model=SendEmailResponse, tags=["Email"])
 async def demarrage_tardif(req: EmailRequest) -> SendEmailResponse:
-    return await _send(req, "demarrage-tardif")
+    """
+    Supports two tables and two Excel attachments.
+    Body must contain __TABLE_1__ (démarrage tardif) and __TABLE_2__ (pas encore démarré).
+    Falls back to single-table mode (__TABLE__) if table_data_2 is not provided.
+    """
+    if req.table_data_2 is not None:
+        # ── Two-table mode ──────────────────────────────────────
+        if "__TABLE_1__" not in req.body or "__TABLE_2__" not in req.body:
+            raise HTTPException(
+                status_code=422,
+                detail="When table_data_2 is provided, body must contain __TABLE_1__ and __TABLE_2__.",
+            )
+        html_body = (
+            req.body
+            .replace("__TABLE_1__", build_html_table(req.table_data))
+            .replace("__TABLE_2__", build_html_table(req.table_data_2))
+        )
+        attachments = [
+            (build_excel_bytes(req.table_data,   sheet_name="demarrage-tardif"),   req.filename   or "demarrage_tardif.xlsx"),
+            (build_excel_bytes(req.table_data_2, sheet_name="pas-encore-demarre"), req.filename_2 or "pas_encore_demarre.xlsx"),
+        ]
+        try:
+            gmail_id = await send_email(
+                to_email=req.to_email,
+                cc_email=req.cc_email,
+                subject=req.subject,
+                html_body=html_body,
+                attachments=attachments,
+            )
+        except RuntimeError as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        return SendEmailResponse(gmail_message_id=gmail_id)
+    else:
+        # ── Single-table fallback ───────────────────────────────
+        return await _send(req, "demarrage-tardif")
 
 
 @app.post("/analyse-evenement-hos", response_model=SendEmailResponse, tags=["Email"])
@@ -161,10 +196,8 @@ async def parse_attachment(req: AttachmentRequest) -> AttachmentResponse:
             attachment_id=req.attachment_id,
         )
     except RuntimeError as exc:
-        # Missing env vars → 500 (server misconfiguration)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     except Exception as exc:
-        # Gmail API errors or parse failures → 502
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     return AttachmentResponse(data=data)
@@ -178,9 +211,7 @@ async def parse_attachment(req: AttachmentRequest) -> AttachmentResponse:
 async def evenement_map(req: EventMapEmailRequest) -> SendEmailResponse:
     """
     Render a satellite map for the given event and send it embedded in an email.
-
-    The 'body' field must contain __MAP__ where the image should appear, e.g.:
-      <p>Bonjour,</p><p>Carte de l'événement :</p>__MAP__
+    Body must contain __MAP__ where the image should appear.
     """
     PLACEHOLDER = "__MAP__"
     if PLACEHOLDER not in req.body:
@@ -227,15 +258,6 @@ async def evenement_map(req: EventMapEmailRequest) -> SendEmailResponse:
     tags=["Map"],
 )
 async def render_map(req: MapRenderRequest) -> MapRenderResponse:
-    """
-    Generates a 760×500 PNG showing:
-    - Satellite tile background (ESRI World Imagery by default, override via MAP_TILE_URL env var)
-    - Vehicle trajectory as a pink polyline
-    - Event popup card at the specified coordinates
-
-    The returned base64 string can be embedded directly in an HTML email body:
-      <img src="data:image/png;base64,{image_b64}" />
-    """
     try:
         png_bytes = await render_event_map(
             trajectory=req.trajectory,

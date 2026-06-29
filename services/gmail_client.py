@@ -25,7 +25,7 @@ from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email import encoders
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 import openpyxl
@@ -148,28 +148,26 @@ def _build_mime_message(
     cc_email: Optional[str],
     subject: str,
     html_body: str,
-    excel_bytes: bytes,
-    filename: str,
+    attachments: List[Tuple[bytes, str]],
 ) -> MIMEMultipart:
-    """Construct a MIME multipart message with an HTML body and Excel attachment."""
+    """Construct a MIME multipart message with an HTML body and one or more Excel attachments."""
     msg = MIMEMultipart("mixed")
     msg["To"] = to_email
     if cc_email:
         msg["Cc"] = cc_email
     msg["Subject"] = subject
 
-    # HTML body
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
-    # Excel attachment
-    part = MIMEBase(
-        "application",
-        "vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
-    part.set_payload(excel_bytes)
-    encoders.encode_base64(part)
-    part.add_header("Content-Disposition", f'attachment; filename="{filename}"')
-    msg.attach(part)
+    for excel_bytes, filename in attachments:
+        part = MIMEBase(
+            "application",
+            "vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        part.set_payload(excel_bytes)
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", f'attachment; filename="{filename}"')
+        msg.attach(part)
 
     return msg
 
@@ -230,20 +228,19 @@ async def send_email(
     cc_email: Optional[str],
     subject: str,
     html_body: str,
-    excel_bytes: bytes,
-    filename: str,
+    attachments: List[Tuple[bytes, str]],
 ) -> str:
     """
-    Send an email with an Excel attachment via the Gmail API.
+    Send an email with one or more Excel attachments via the Gmail API.
 
+    :param attachments: list of (excel_bytes, filename) tuples.
     :returns: The Gmail message ID of the sent message.
     :raises httpx.HTTPStatusError: on non-2xx from Gmail.
     """
     access_token = await _get_access_token()
 
-    msg = _build_mime_message(to_email, cc_email, subject, html_body, excel_bytes, filename)
+    msg = _build_mime_message(to_email, cc_email, subject, html_body, attachments)
 
-    # Gmail API expects the raw MIME message encoded as base64url
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
 
     async with httpx.AsyncClient(timeout=30.0) as client:

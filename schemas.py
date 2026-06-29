@@ -55,6 +55,10 @@ class EmailRequest(BaseModel):
     date_field: Optional[str] = "Date"
     # Override the default attachment filename (must end in .xlsx)
     filename: Optional[str] = None
+    # Second table — used by endpoints that send two datasets (e.g. demarrage-tardif)
+    # Body must contain __TABLE_1__ and __TABLE_2__ when this is provided
+    table_data_2: Optional[List[Dict[str, Any]]] = None
+    filename_2: Optional[str] = None
 
 
 class SendEmailResponse(BaseModel):
