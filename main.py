@@ -62,12 +62,13 @@ def _build_response(req: EmailRequest, case_slug: str) -> EmailResponse:
     html_table = build_html_table(req.table_data)
 
     # Inject the table into the caller-supplied HTML body
-    if "{{TABLE}}" not in req.body:
+    PLACEHOLDER = "__TABLE__"
+    if PLACEHOLDER not in req.body:
         raise HTTPException(
             status_code=422,
-            detail="Field 'body' must contain the placeholder {{TABLE}}.",
+            detail="Field 'body' must contain the placeholder __TABLE__.",
         )
-    html_body = req.body.replace("{{TABLE}}", html_table)
+    html_body = req.body.replace(PLACEHOLDER, html_table)
 
     excel_bytes = build_excel_bytes(req.table_data, sheet_name=case_slug)
     excel_b64 = base64.b64encode(excel_bytes).decode("utf-8")
