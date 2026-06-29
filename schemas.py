@@ -10,6 +10,8 @@ class EmailRequest(BaseModel):
     body: str
     # Array of flat objects; all objects must share the same keys
     table_data: List[Dict[str, Any]]
+    # ETAT GPS only: name of the date column used to highlight rows ≠ today
+    date_field: Optional[str] = "Date"
 
 
 class SendEmailResponse(BaseModel):

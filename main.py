@@ -19,7 +19,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from schemas import AttachmentRequest, AttachmentResponse, EmailRequest, SendEmailResponse
 from services.gmail_client import fetch_attachment_as_excel_json, send_email
-from services.table_builder import build_excel_bytes, build_html_table
+from services.table_builder import (
+    build_excel_bytes,
+    build_excel_bytes_etat_gps,
+    build_html_table,
+    build_html_table_etat_gps,
+)
 
 # ──────────────────────────────────────────────────────────────
 # App
@@ -82,7 +87,29 @@ async def _send(req: EmailRequest, case_slug: str) -> SendEmailResponse:
 
 @app.post("/etat-gps", response_model=SendEmailResponse, tags=["Email"])
 async def etat_gps(req: EmailRequest) -> SendEmailResponse:
-    return await _send(req, "etat-gps")
+    PLACEHOLDER = "__TABLE__"
+    if PLACEHOLDER not in req.body:
+        raise HTTPException(status_code=422, detail="Field 'body' must contain the placeholder __TABLE__.")
+
+    date_field = req.date_field or "Date"
+    html_body = req.body.replace(PLACEHOLDER, build_html_table_etat_gps(req.table_data, date_field))
+    excel_bytes = build_excel_bytes_etat_gps(req.table_data, sheet_name="etat-gps", date_field=date_field)
+
+    try:
+        gmail_id = await send_email(
+            to_email=req.to_email,
+            cc_email=req.cc_email,
+            subject=req.subject,
+            html_body=html_body,
+            excel_bytes=excel_bytes,
+            filename="etat_gps.xlsx",
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return SendEmailResponse(gmail_message_id=gmail_id)
 
 
 @app.post("/demarrage-tardif", response_model=SendEmailResponse, tags=["Email"])
