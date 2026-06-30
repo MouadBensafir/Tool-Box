@@ -17,6 +17,7 @@ POST /evenement-map          → SendEmailResponse
 POST /render-event-map       → MapRenderResponse
 """
 
+import asyncio
 import base64
 
 from fastapi import FastAPI, HTTPException
@@ -138,14 +139,20 @@ async def demarrage_tardif(req: EmailRequest) -> SendEmailResponse:
                 status_code=422,
                 detail="When table_data_2 is provided, body must contain __TABLE_1__ and __TABLE_2__.",
             )
+        # Build both Excel files concurrently to reduce response time
+        loop = asyncio.get_event_loop()
+        excel1, excel2 = await asyncio.gather(
+            loop.run_in_executor(None, build_excel_bytes, req.table_data,   "demarrage-tardif"),
+            loop.run_in_executor(None, build_excel_bytes, req.table_data_2, "pas-encore-demarre"),
+        )
         html_body = (
             req.body
             .replace("__TABLE_1__", build_html_table(req.table_data))
             .replace("__TABLE_2__", build_html_table(req.table_data_2))
         )
         attachments = [
-            (build_excel_bytes(req.table_data,   sheet_name="demarrage-tardif"),   req.filename   or "demarrage_tardif.xlsx"),
-            (build_excel_bytes(req.table_data_2, sheet_name="pas-encore-demarre"), req.filename_2 or "pas_encore_demarre.xlsx"),
+            (excel1, req.filename   or "demarrage_tardif.xlsx"),
+            (excel2, req.filename_2 or "pas_encore_demarre.xlsx"),
         ]
         try:
             gmail_id = await send_email(

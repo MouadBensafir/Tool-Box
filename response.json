@@ -1,0 +1,16 @@
+{
+    "ParamOrganisationListFM":["-6230425177667903426"],
+    "ParamIsSubscription":["0"],
+    "ParamReportType":["Vehicle"],
+    "ParamVehicleList":["1633666825093173248","1633666833471172608"],
+    "ParamEventList":["-4528483983887524859","-5008324830407203807","-8966243220657368530","1847393891299746796"],
+    "ParamShowColumns":["0","AssetName1","Driver","SiteName2"],
+    "ParamSubscriptionDateRangeType":["1"],
+    "ParamDateFrom":["06/30/2026 00:00:00"],
+    "ParamDateTo":["06/30/2026 23:59:59"],
+    "ParamZeroSecondEvents":["2"],
+    "ParamAnyEventsBetween":["0"],
+    "ParamAnd":["23"],
+    "ParamReportOutput":["Download"],
+    "ParamReportFormat":["CSV"]
+}
