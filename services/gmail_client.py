@@ -117,8 +117,14 @@ def _parse_excel(excel_bytes: bytes) -> List[Dict[str, Any]]:
         raise ValueError(f"Could not open workbook: {exc}") from exc
 
     ws = wb.active
-    ws.reset_dimensions()  # ignore cached <dimension ref> — recalculate from actual cells
-    rows = list(ws.iter_rows(values_only=True))
+    # Avoid trusting the cached <dimension ref> in the file — iterate with explicit bounds
+    rows = list(ws.iter_rows(
+        min_row=1,
+        max_row=ws.max_row,
+        min_col=1,
+        max_col=ws.max_column,
+        values_only=True,
+    ))
 
     if not rows:
         return []
