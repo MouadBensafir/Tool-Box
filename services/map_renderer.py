@@ -191,13 +191,19 @@ _HTML_TEMPLATE = """\
 
 def _build_popup_html(event: Dict[str, Any]) -> str:
     """Build the inner HTML for the event popup card (MiX Telematics style, French labels)."""
+    date = event.get("date_depart", "")
+    def _fmt_time(t: str) -> str:
+        if not t:
+            return ""
+        return f"{date} {t} (WAT)".strip() if date else f"{t} (WAT)"
+
     fields = [
         ("Nom de l'événement :",      event.get("event_name", "")),
         ("Chauffeur :",               event.get("driver", "")),
         ("ID du conducteur :",        event.get("driver_id", "")),
         ("Actif :",                   event.get("asset", "")),
-        ("Heure de début :",          event.get("start_time", "")),
-        ("Heure de fin :",            event.get("end_time", "")),
+        ("Heure de début :",          _fmt_time(event.get("start_time", ""))),
+        ("Heure de fin :",            _fmt_time(event.get("end_time", ""))),
         ("Durée :",                   event.get("duration", "")),
         ("Nom de la localisation :",  event.get("location_name", "")),
         ("Limitation de vitesse :",   event.get("speed_limit", "")),
