@@ -214,14 +214,35 @@ async def parse_attachment(req: AttachmentRequest) -> AttachmentResponse:
 # Map rendering + email endpoint
 # ──────────────────────────────────────────────────────────────
 
+def _build_event_table_html(ev) -> str:
+    """Build the event summary table shown above the satellite map."""
+    row = {
+        "Description du véhicule":    ev.asset,
+        "Immatriculation":            ev.immatriculation,
+        "Site":                       ev.site,
+        "Conducteur":                 ev.conducteur,
+        "Chauffeur":                  ev.driver,
+        "Description de l'événement": ev.event_name,
+        "Start date":                 ev.date_depart,
+        "Heure de début":             ev.start_time,
+        "Heure de fin":               ev.end_time,
+        "Nbre d'occurrences":         ev.nbre_occurrences,
+        "Valeur de l'événement":      ev.event_value,
+        "Durée totale (hh:mm:ss)":    ev.duration,
+    }
+    # Drop empty columns so the table stays compact
+    row = {k: v for k, v in row.items() if v not in (None, "", 0)}
+    return build_html_table([row])
+
+
 @app.post("/evenement-map", response_model=SendEmailResponse, tags=["Email"])
 async def evenement_map(req: EventMapEmailRequest) -> SendEmailResponse:
     """
     Render a satellite map for the given event and send it embedded in an email.
-    Body must contain __MAP__ where the image should appear.
+    Body must contain __MAP__ where the satellite image will be injected.
+    Body may also contain __TABLE__ where the event summary table will be injected.
     """
-    PLACEHOLDER = "__MAP__"
-    if PLACEHOLDER not in req.body:
+    if "__MAP__" not in req.body:
         raise HTTPException(
             status_code=422,
             detail="Field 'body' must contain the placeholder __MAP__.",
@@ -236,7 +257,10 @@ async def evenement_map(req: EventMapEmailRequest) -> SendEmailResponse:
         raise HTTPException(status_code=500, detail=f"Map render failed: {exc}") from exc
 
     img_tag = '<img src="cid:event_map" style="max-width:100%;border:1px solid #ddd;" />'
-    html_body = req.body.replace(PLACEHOLDER, img_tag)
+    html_body = req.body.replace("__MAP__", img_tag)
+
+    if "__TABLE__" in html_body:
+        html_body = html_body.replace("__TABLE__", _build_event_table_html(req.event))
 
     try:
         gmail_id = await send_email_with_map(

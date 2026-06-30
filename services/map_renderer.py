@@ -141,6 +141,23 @@ _HTML_TEMPLATE = """\
    .bindPopup(POPUP_HTML, { maxWidth: 280, closeButton: false, autoClose: false })
    .openPopup();
 
+  /* Blue flag marker at the start of the trip (first position) */
+  if (TRAJECTORY.length > 0) {
+    var startPt = TRAJECTORY[0];
+    var flagIcon = L.divIcon({
+      className: '',
+      html: '<svg width="24" height="32" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg">'
+          /* flagpole */
+          + '<line x1="4" y1="2" x2="4" y2="31" stroke="#555" stroke-width="2" stroke-linecap="round"/>'
+          /* flag body */
+          + '<polygon points="4,2 22,8 4,16" fill="#2979ff" stroke="#1a56cc" stroke-width="0.8"/>'
+          + '</svg>',
+      iconSize:   [24, 32],
+      iconAnchor: [4, 31]   /* tip of the pole sits on the coordinate */
+    });
+    L.marker(startPt, { icon: flagIcon, interactive: false }).addTo(map);
+  }
+
   /* Truck marker at the end of the trip (last position) */
   if (TRAJECTORY.length > 0) {
     var endPt = TRAJECTORY[TRAJECTORY.length - 1];

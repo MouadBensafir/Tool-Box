@@ -7,15 +7,23 @@ from typing import Any, Dict, List, Optional
 class EventInfo(BaseModel):
     lat: float
     lng: float
+    # Map popup fields
     event_name: str = ""
-    driver: str = ""
-    driver_id: str = ""
-    asset: str = ""
-    start_time: str = ""
+    driver: str = ""        # Chauffeur (from trip positions)
+    driver_id: str = ""     # ID du conducteur
+    asset: str = ""         # Description du véhicule
+    start_time: str = ""    # full datetime string, e.g. "30/06/2026 11:21:52 (WAT)"
     end_time: str = ""
     duration: str = ""
     location_name: str = ""
     speed_limit: str = ""
+    # Extra fields for the event summary table above the map
+    immatriculation: str = ""
+    site: str = ""
+    conducteur: str = ""    # Conducteur column (may differ from driver/chauffeur)
+    date_depart: str = ""   # Date only, e.g. "30/06/2026"
+    nbre_occurrences: int = 0
+    event_value: str = ""   # e.g. "33,00"
 
 
 class MapRenderRequest(BaseModel):
