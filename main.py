@@ -19,6 +19,9 @@ POST /render-event-map       → MapRenderResponse
 
 import asyncio
 import base64
+import logging
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -203,8 +206,10 @@ async def parse_attachment(req: AttachmentRequest) -> AttachmentResponse:
             attachment_id=req.attachment_id,
         )
     except RuntimeError as exc:
+        logger.exception("parse-attachment RuntimeError")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     except Exception as exc:
+        logger.exception("parse-attachment unexpected error")
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     return AttachmentResponse(data=data)
