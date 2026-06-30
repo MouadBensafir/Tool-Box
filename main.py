@@ -256,7 +256,13 @@ async def evenement_map(req: EventMapEmailRequest) -> SendEmailResponse:
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Map render failed: {exc}") from exc
 
-    img_tag = '<img src="cid:event_map" style="width:100%;border:1px solid #ddd;display:block;" />'
+    img_tag = (
+        '<table width="100%" cellpadding="0" cellspacing="0" border="0">'
+        '<tr><td style="padding:0;">'
+        '<img src="cid:event_map" width="100%" height="auto"'
+        ' style="display:block;width:100%;height:auto;border:1px solid #ddd;" />'
+        '</td></tr></table>'
+    )
     html_body = req.body.replace("__MAP__", img_tag)
 
     if "__TABLE__" in html_body:

@@ -19,8 +19,8 @@ _DEFAULT_TILE_URL = (
     "/World_Imagery/MapServer/tile/{z}/{y}/{x}"
 )
 
-_MAP_WIDTH = 760
-_MAP_HEIGHT = 500
+_MAP_WIDTH = 1100
+_MAP_HEIGHT = 700
 
 # ── HTML template ──────────────────────────────────────────────────────────────
 # Dynamic values are injected as JS variables to avoid f-string / brace conflicts.
