@@ -71,9 +71,9 @@ _HTML_TEMPLATE = """\
   var TRAJECTORY = INJECT_TRAJECTORY;
   var POPUP_HTML = INJECT_POPUP_HTML;
 
-  /* Map centered on the event — zoom 18 matches MiX Telematics ~100m scale */
+  /* Map centered on the event */
   var map = L.map('map', { zoomControl: true, attributionControl: false })
-             .setView(CENTER, 18);
+             .setView(CENTER, 17);
 
   L.tileLayer(TILE_URL, { maxZoom: 20 }).addTo(map);
 
