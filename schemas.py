@@ -11,11 +11,11 @@ class EventInfo(BaseModel):
     driver: str = ""
     driver_id: str = ""
     asset: str = ""
-    asset_id: str = ""
     start_time: str = ""
     end_time: str = ""
     duration: str = ""
     location_name: str = ""
+    speed_limit: str = ""
 
 
 class MapRenderRequest(BaseModel):

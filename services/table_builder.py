@@ -141,15 +141,33 @@ def build_excel_bytes_etat_gps(
     if not data:
         buf = io.BytesIO(); wb.save(buf); return buf.getvalue()
     headers = list(data[0].keys())
+
+    # ── Title block: "ETAT GPS DU / DD/MM/YYYY" in the column after the data ──
+    _WHITE_BOLD_ON_BLACK = Font(color="FFFFFF", bold=True, name="Arial", size=11)
+    title_col = len(headers) + 2          # one blank column gap
+    today_str = date.today().strftime("%d/%m/%Y")
+    for row_idx, text in [(1, "ETAT GPS DU"), (2, today_str)]:
+        c = ws.cell(row=row_idx, column=title_col, value=text)
+        c.fill      = _BLACK_FILL
+        c.font      = _WHITE_BOLD_ON_BLACK
+        c.alignment = Alignment(horizontal="center", vertical="center")
+    ws.column_dimensions[
+        ws.cell(row=1, column=title_col).column_letter
+    ].width = 16
+
+    # ── Headers ──────────────────────────────────────────────────
     for ci, h in enumerate(headers, 1):
         c = ws.cell(row=1, column=ci, value=h)
         c.fill = _GRAY_FILL; c.font = _BLACK_BOLD_FONT; c.border = _BORDER; c.alignment = _CENTER
+
+    # ── Data rows ─────────────────────────────────────────────────
     for ri, row in enumerate(data, 2):
         yellow = not _is_today(row.get(date_field))
         for ci, h in enumerate(headers, 1):
             c = ws.cell(row=ri, column=ci, value=row.get(h))
             c.fill = _YELLOW_FILL if yellow else _WHITE_FILL
             c.font = _BLACK_FONT; c.border = _BORDER; c.alignment = _CENTER
+
     _autofit(ws)
     ws.freeze_panes = "A2"
     buf = io.BytesIO(); wb.save(buf); return buf.getvalue()

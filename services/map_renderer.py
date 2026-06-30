@@ -140,6 +140,32 @@ _HTML_TEMPLATE = """\
    .addTo(map)
    .bindPopup(POPUP_HTML, { maxWidth: 280, closeButton: false, autoClose: false })
    .openPopup();
+
+  /* Truck marker at the end of the trip (last position) */
+  if (TRAJECTORY.length > 0) {
+    var endPt = TRAJECTORY[TRAJECTORY.length - 1];
+    var truckIcon = L.divIcon({
+      className: '',
+      html: '<svg width="30" height="30" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">'
+          + '<circle cx="15" cy="15" r="13" fill="white" stroke="#22bb22" stroke-width="2.5"/>'
+          /* cargo body */
+          + '<rect x="5" y="14" width="12" height="8" rx="1" fill="' + PINK + '"/>'
+          /* cab */
+          + '<rect x="16" y="11" width="8" height="11" rx="1.5" fill="' + PINK + '"/>'
+          /* windshield */
+          + '<rect x="17" y="12" width="6" height="5" rx="0.5" fill="white" opacity="0.55"/>'
+          /* rear wheel */
+          + '<circle cx="9" cy="23" r="2.5" fill="#444"/>'
+          + '<circle cx="9" cy="23" r="1.2" fill="#ccc"/>'
+          /* front wheel */
+          + '<circle cx="20" cy="23" r="2.5" fill="#444"/>'
+          + '<circle cx="20" cy="23" r="1.2" fill="#ccc"/>'
+          + '</svg>',
+      iconSize:   [30, 30],
+      iconAnchor: [15, 15]
+    });
+    L.marker(endPt, { icon: truckIcon, interactive: false }).addTo(map);
+  }
 </script>
 </body>
 </html>
@@ -147,24 +173,24 @@ _HTML_TEMPLATE = """\
 
 
 def _build_popup_html(event: Dict[str, Any]) -> str:
-    """Build the inner HTML for the event popup card (MiX Telematics style)."""
+    """Build the inner HTML for the event popup card (MiX Telematics style, French labels)."""
     fields = [
-        ("Event name:",    event.get("event_name", "")),
-        ("Driver:",        event.get("driver", "")),
-        ("Driver ID:",     event.get("driver_id", "")),
-        ("Asset:",         event.get("asset", "")),
-        ("Asset ID:",      event.get("asset_id", "")),
-        ("Start time:",    event.get("start_time", "")),
-        ("End time:",      event.get("end_time", "")),
-        ("Duration:",      event.get("duration", "")),
-        ("Location name:", event.get("location_name", "")),
+        ("Nom de l'événement :",      event.get("event_name", "")),
+        ("Chauffeur :",               event.get("driver", "")),
+        ("ID du conducteur :",        event.get("driver_id", "")),
+        ("Actif :",                   event.get("asset", "")),
+        ("Heure de début :",          event.get("start_time", "")),
+        ("Heure de fin :",            event.get("end_time", "")),
+        ("Durée :",                   event.get("duration", "")),
+        ("Nom de la localisation :",  event.get("location_name", "")),
+        ("Limitation de vitesse :",   event.get("speed_limit", "")),
     ]
     rows = "".join(
         f'<tr><td class="pk">{k}</td><td class="pv">{v}</td></tr>'
         for k, v in fields
         if v
     )
-    return f'<div class="pb"><div class="pb-title">Event start</div><table>{rows}</table></div>'
+    return f'<div class="pb"><div class="pb-title">Début de l\'événement</div><table>{rows}</table></div>'
 
 
 async def render_event_map(
