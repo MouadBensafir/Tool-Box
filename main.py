@@ -232,7 +232,7 @@ def _build_event_table_html(ev) -> str:
     }
     # Drop empty columns so the table stays compact
     row = {k: v for k, v in row.items() if v not in (None, "", 0)}
-    return build_html_table([row])
+    return build_html_table([row], compact=True)
 
 
 @app.post("/evenement-map", response_model=SendEmailResponse, tags=["Email"])
@@ -256,7 +256,7 @@ async def evenement_map(req: EventMapEmailRequest) -> SendEmailResponse:
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Map render failed: {exc}") from exc
 
-    img_tag = '<img src="cid:event_map" style="max-width:100%;border:1px solid #ddd;" />'
+    img_tag = '<img src="cid:event_map" style="width:100%;border:1px solid #ddd;display:block;" />'
     html_body = req.body.replace("__MAP__", img_tag)
 
     if "__TABLE__" in html_body:

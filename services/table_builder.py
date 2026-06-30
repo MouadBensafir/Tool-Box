@@ -76,13 +76,26 @@ _WHITE_BOLD_FONT = Font(color="FFFFFF", bold=True,  name="Arial", size=11)
 _BLACK_FONT      = Font(color="000000", bold=False, name="Arial", size=11)
 
 
-def build_html_table(data: List[Dict[str, Any]]) -> str:
+_COMPACT_CELL_BASE = (
+    "padding:2px 4px;"
+    "border:1px solid #000000;"
+    "text-align:center;"
+    "font-family:Arial,sans-serif;"
+    "font-size:11px;"
+)
+_COMPACT_TH = f"background-color:#000000;color:#ffffff;font-weight:bold;{_COMPACT_CELL_BASE}"
+_COMPACT_TD = f"background-color:#ffffff;color:#000000;{_COMPACT_CELL_BASE}"
+
+
+def build_html_table(data: List[Dict[str, Any]], compact: bool = False) -> str:
     if not data:
         return "<p><em>Aucune donnée disponible.</em></p>"
     headers = list(data[0].keys())
-    ths = "".join(f'<th style="{_STD_TH}">{h}</th>' for h in headers)
+    th_style = _COMPACT_TH if compact else _STD_TH
+    td_style = _COMPACT_TD if compact else _STD_TD
+    ths = "".join(f'<th style="{th_style}">{h}</th>' for h in headers)
     rows = "".join(
-        "<tr>" + "".join(f'<td style="{_STD_TD}">{_safe(row.get(h))}</td>' for h in headers) + "</tr>"
+        "<tr>" + "".join(f'<td style="{td_style}">{_safe(row.get(h))}</td>' for h in headers) + "</tr>"
         for row in data
     )
     return f'<table style="{_TABLE_STYLE}"><thead><tr>{ths}</tr></thead><tbody>{rows}</tbody></table>'
