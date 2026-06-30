@@ -55,11 +55,17 @@ _HTML_TEMPLATE = """\
     .pb .pk {
       font-weight: bold;
       color: #222;
-      padding: 1px 8px 1px 0;
+      padding: 2px 8px 2px 0;
       white-space: nowrap;
       vertical-align: top;
+      text-align: right;
     }
-    .pb .pv { color: #222; padding: 1px 0; vertical-align: top; }
+    .pb .pv {
+      color: #222;
+      padding: 2px 0 2px 8px;
+      vertical-align: top;
+      border-left: 1px solid #ccc;
+    }
   </style>
 </head>
 <body>
@@ -200,7 +206,7 @@ def _build_popup_html(event: Dict[str, Any]) -> str:
     fields = [
         ("Nom de l'événement :",      event.get("event_name", "")),
         ("Chauffeur :",               event.get("driver", "")),
-        ("ID du conducteur :",        event.get("driver_id", "")),
+        ("ID du conducteur :",        f'<b>{event.get("driver_id", "")}</b>' if event.get("driver_id") else ""),
         ("Actif :",                   event.get("asset", "")),
         ("Heure de début :",          _fmt_time(event.get("start_time", ""))),
         ("Heure de fin :",            _fmt_time(event.get("end_time", ""))),
