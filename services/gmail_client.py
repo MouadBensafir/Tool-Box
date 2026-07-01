@@ -20,6 +20,7 @@ Required OAuth2 scopes on the refresh token:
 import base64
 import io
 import os
+from zipfile import BadZipFile
 from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
@@ -29,6 +30,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 import openpyxl
+import xlrd
 
 GMAIL_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
@@ -110,21 +112,32 @@ async def fetch_attachment_as_excel_json(
 
 
 def _parse_excel(excel_bytes: bytes) -> List[Dict[str, Any]]:
-    """Load workbook from bytes and return the first sheet as a list of dicts."""
+    """Load workbook from bytes and return the first sheet as a list of dicts.
+    Supports both .xlsx (openpyxl) and legacy .xls (xlrd) formats.
+    """
+    rows: list
+
     try:
+        # .xlsx — ZIP-based format
         wb = openpyxl.load_workbook(io.BytesIO(excel_bytes), data_only=True)
+        ws = wb.active
+        rows = list(ws.iter_rows(
+            min_row=1,
+            max_row=ws.max_row,
+            min_col=1,
+            max_col=ws.max_column,
+            values_only=True,
+        ))
+    except BadZipFile:
+        # .xls — legacy OLE format
+        try:
+            wb_xls = xlrd.open_workbook(file_contents=excel_bytes)
+            ws_xls = wb_xls.sheet_by_index(0)
+            rows = [tuple(ws_xls.row_values(r)) for r in range(ws_xls.nrows)]
+        except Exception as exc:
+            raise ValueError(f"Could not open workbook as .xls: {exc}") from exc
     except Exception as exc:
         raise ValueError(f"Could not open workbook: {exc}") from exc
-
-    ws = wb.active
-    # Avoid trusting the cached <dimension ref> in the file — iterate with explicit bounds
-    rows = list(ws.iter_rows(
-        min_row=1,
-        max_row=ws.max_row,
-        min_col=1,
-        max_col=ws.max_column,
-        values_only=True,
-    ))
 
     if not rows:
         return []
@@ -137,8 +150,7 @@ def _parse_excel(excel_bytes: bytes) -> List[Dict[str, Any]]:
 
     result: List[Dict[str, Any]] = []
     for row in rows[1:]:
-        # Skip entirely empty rows
-        if any(cell is not None for cell in row):
+        if any(cell is not None and cell != "" for cell in row):
             result.append(
                 {headers[i]: row[i] for i in range(min(len(headers), len(row)))}
             )
