@@ -33,6 +33,7 @@ from schemas import (
     EventMapEmailRequest,
     MapRenderRequest,
     MapRenderResponse,
+    RapportMensuelRequest,
     SendEmailResponse,
 )
 from services.gmail_client import fetch_attachment_as_excel_json, send_email, send_email_with_map
@@ -188,6 +189,30 @@ async def survitesse(req: EmailRequest) -> SendEmailResponse:
 # ──────────────────────────────────────────────────────────────
 # Excel retrieval / parsing endpoint
 # ──────────────────────────────────────────────────────────────
+
+@app.post("/rapport-mensuel", response_model=SendEmailResponse, tags=["Email"])
+async def rapport_mensuel(req: RapportMensuelRequest) -> SendEmailResponse:
+    """
+    Send the monthly report email with a pre-built HTML body and an Excel
+    attachment generated from table_data. No __TABLE__ placeholder needed.
+    """
+    excel_bytes = build_excel_bytes(req.table_data, sheet_name="Rapport Mensuel")
+    try:
+        gmail_id = await send_email(
+            to_email=req.to_email,
+            cc_email=req.cc_email,
+            subject=req.subject,
+            html_body=req.body,
+            attachments=[(excel_bytes, req.filename or "rapport_mensuel.xlsx")],
+        )
+    except RuntimeError as exc:
+        logger.exception("rapport-mensuel RuntimeError")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("rapport-mensuel unexpected error")
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return SendEmailResponse(gmail_message_id=gmail_id)
+
 
 @app.post(
     "/parse-attachment",

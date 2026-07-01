@@ -74,6 +74,15 @@ class SendEmailResponse(BaseModel):
     gmail_message_id: str
 
 
+class RapportMensuelRequest(BaseModel):
+    to_email: str
+    cc_email: Optional[str] = None
+    subject: str
+    body: str  # complete HTML — no placeholder required
+    table_data: List[Dict[str, Any]]  # monthly report rows → Excel attachment
+    filename: Optional[str] = "rapport_mensuel.xlsx"
+
+
 class AttachmentRequest(BaseModel):
     message_id: str
     attachment_id: str
