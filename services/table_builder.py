@@ -120,6 +120,52 @@ def build_excel_bytes(data: List[Dict[str, Any]], sheet_name: str = "Rapport") -
     buf = io.BytesIO(); wb.save(buf); return buf.getvalue()
 
 
+# ─── Rapport Mensuel style (dark navy header, alternating blue/white rows) ────
+_NAVY_FILL       = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+_LIGHT_BLUE_FILL = PatternFill(start_color="BDD7EE", end_color="BDD7EE", fill_type="solid")
+_WHITE_FONT_BOLD = Font(color="FFFFFF", bold=True, name="Arial", size=11)
+_DARK_FONT       = Font(color="000000", bold=False, name="Arial", size=11)
+
+
+def build_excel_bytes_rapport_mensuel(
+    data: List[Dict[str, Any]],
+    sheet_name: str = "Rapport Mensuel",
+) -> bytes:
+    """
+    Excel with a dark navy header row and alternating light-blue / white data rows,
+    matching the RECAPITULATIF RAPPORT DES 3 AXIS style.
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = sheet_name[:31]
+    if not data:
+        buf = io.BytesIO(); wb.save(buf); return buf.getvalue()
+
+    headers = list(data[0].keys())
+
+    # ── Header row ────────────────────────────────────────────────
+    for ci, h in enumerate(headers, 1):
+        c = ws.cell(row=1, column=ci, value=h)
+        c.fill      = _NAVY_FILL
+        c.font      = _WHITE_FONT_BOLD
+        c.border    = _BORDER
+        c.alignment = _CENTER
+
+    # ── Data rows — alternating light blue / white ─────────────────
+    for ri, row in enumerate(data, 2):
+        fill = _LIGHT_BLUE_FILL if ri % 2 == 0 else _WHITE_FILL
+        for ci, h in enumerate(headers, 1):
+            c = ws.cell(row=ri, column=ci, value=row.get(h))
+            c.fill      = fill
+            c.font      = _DARK_FONT
+            c.border    = _BORDER
+            c.alignment = _CENTER
+
+    _autofit(ws)
+    ws.freeze_panes = "A2"
+    buf = io.BytesIO(); wb.save(buf); return buf.getvalue()
+
+
 # ─── ETAT GPS style ───────────────────────────────────────────
 _GPS_TH     = f"background-color:#a6a6a6;color:#000000;font-weight:bold;{_CELL_BASE}"
 _GPS_WHITE  = f"background-color:#ffffff;color:#000000;{_CELL_BASE}"

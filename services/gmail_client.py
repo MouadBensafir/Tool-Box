@@ -111,10 +111,28 @@ async def fetch_attachment_as_excel_json(
     return _parse_excel(excel_bytes)
 
 
+_NON_EXCEL_MAGIC = [
+    b'\x89PNG',  # PNG
+    b'\xff\xd8',  # JPEG
+    b'%PDF',      # PDF
+    b'GIF8',      # GIF
+    b'RIFF',      # WebP / WAV
+    b'\x00\x00\x00',  # MP4 / MOV family
+]
+
+
 def _parse_excel(excel_bytes: bytes) -> List[Dict[str, Any]]:
     """Load workbook from bytes and return the first sheet as a list of dicts.
     Supports both .xlsx (openpyxl) and legacy .xls (xlrd) formats.
+    Returns [] silently for non-Excel files (images, PDFs, etc.).
     """
+    if not excel_bytes or len(excel_bytes) < 8:
+        return []
+
+    for magic in _NON_EXCEL_MAGIC:
+        if excel_bytes[:len(magic)] == magic:
+            return []
+
     rows: list
 
     try:

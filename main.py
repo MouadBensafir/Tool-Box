@@ -41,6 +41,7 @@ from services.map_renderer import render_event_map
 from services.table_builder import (
     build_excel_bytes,
     build_excel_bytes_etat_gps,
+    build_excel_bytes_rapport_mensuel,
     build_html_table,
     build_html_table_etat_gps,
 )
@@ -196,7 +197,7 @@ async def rapport_mensuel(req: RapportMensuelRequest) -> SendEmailResponse:
     Send the monthly report email with a pre-built HTML body and an Excel
     attachment generated from table_data. No __TABLE__ placeholder needed.
     """
-    excel_bytes = build_excel_bytes(req.table_data, sheet_name="Rapport Mensuel")
+    excel_bytes = build_excel_bytes_rapport_mensuel(req.table_data, sheet_name="Rapport Mensuel")
     try:
         gmail_id = await send_email(
             to_email=req.to_email,
