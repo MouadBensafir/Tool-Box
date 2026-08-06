@@ -1,0 +1,16 @@
+{
+  "name": "vitesse-violation-processor",
+  "version": "1.0.0",
+  "description": "External processing service for EXCES DE VITESSE: handles the per-violation loop (tachograph + positions fetch, OBC analysis, screenshot capture) outside Fusion AI's stateful execution model, to avoid the memory ceiling that crashes the Fusion workflow on large batches.",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
