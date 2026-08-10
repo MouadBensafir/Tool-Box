@@ -9,14 +9,15 @@ const PAGE_MARGIN = 0;
 const HEADER_FONT_SIZE = 11;
 const ROW_HEIGHT = 34;
 const TACHO_COL_WIDTH = 170;
-const TACHO_ROW_HEIGHT = 16;
+const TACHO_FONT_SIZE = 8;
+const TACHO_HEADER_HEIGHT = 22;
 const GAP = 0;
 
-function drawCell(doc, { x, y, width, height, text, fill, textColor, bold }) {
+function drawCell(doc, { x, y, width, height, text, fill, textColor, bold, fontSize = HEADER_FONT_SIZE }) {
   doc.save();
   doc.rect(x, y, width, height).fillAndStroke(fill, "#B7B7B7");
   doc.restore();
-  doc.fillColor(textColor).font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(HEADER_FONT_SIZE);
+  doc.fillColor(textColor).font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(fontSize);
   const textHeight = doc.heightOfString(String(text ?? ""), { width: width - 4 });
   doc.text(String(text ?? ""), x + 2, y + Math.max(2, (height - textHeight) / 2), {
     width: width - 4,
@@ -51,21 +52,31 @@ function drawEventTable(doc, item, eventCols, x, y, totalWidth) {
 // l'image -- les lignes surlignées (début/fin du créneau retenu) sont déjà
 // marquées par Fusion (`highlighted: true`), ce module se contente de les
 // peindre en jaune.
+//
+// La hauteur de chaque ligne est calculée pour que le tableau remplisse
+// TOUJOURS exactement `maxHeight` (colonne étirée sur toute la hauteur
+// disponible, jamais un simple bloc de N lignes à hauteur fixe qui
+// s'arrêterait en laissant du blanc en dessous). Police dédiée plus petite
+// que le tableau principal : à TACHO_FONT_SIZE et une colonne "Horodatage"
+// large de 60% de 170px, l'horodatage complet ("AAAA-MM-JJ HH:MM:SS") tient
+// sur une seule ligne -- avec la police du tableau principal (beaucoup plus
+// grande), il retournait à la ligne et l'heure débordait hors de la ligne
+// suivante.
 function drawTachoTable(doc, tachoTable, x, y, width, maxHeight) {
-  const headerH = TACHO_ROW_HEIGHT;
-  drawCell(doc, { x, y, width: width * 0.6, height: headerH, text: "Horodatage", fill: "#000000", textColor: "#FFFFFF", bold: true });
-  drawCell(doc, { x: x + width * 0.6, y, width: width * 0.4, height: headerH, text: "Vitesse", fill: "#000000", textColor: "#FFFFFF", bold: true });
+  const headerH = TACHO_HEADER_HEIGHT;
+  drawCell(doc, { x, y, width: width * 0.6, height: headerH, text: "Horodatage", fill: "#000000", textColor: "#FFFFFF", bold: true, fontSize: TACHO_FONT_SIZE });
+  drawCell(doc, { x: x + width * 0.6, y, width: width * 0.4, height: headerH, text: "Vitesse", fill: "#000000", textColor: "#FFFFFF", bold: true, fontSize: TACHO_FONT_SIZE });
 
+  const bodyHeight = maxHeight - headerH;
+  const rowH = tachoTable.length > 0 ? bodyHeight / tachoTable.length : 0;
   let ry = y + headerH;
-  const maxRows = Math.max(0, Math.floor((maxHeight - headerH) / TACHO_ROW_HEIGHT));
-  const rows = tachoTable.slice(0, maxRows);
-  for (const r of rows) {
+  for (const r of tachoTable) {
     const fill = r.highlighted ? "#FFFF00" : "#FFFFFF";
-    drawCell(doc, { x, y: ry, width: width * 0.6, height: TACHO_ROW_HEIGHT, text: r.datetime, fill, textColor: "#000000", bold: !!r.highlighted });
-    drawCell(doc, { x: x + width * 0.6, y: ry, width: width * 0.4, height: TACHO_ROW_HEIGHT, text: r.value, fill, textColor: "#000000", bold: !!r.highlighted });
-    ry += TACHO_ROW_HEIGHT;
+    drawCell(doc, { x, y: ry, width: width * 0.6, height: rowH, text: r.datetime, fill, textColor: "#000000", bold: !!r.highlighted, fontSize: TACHO_FONT_SIZE });
+    drawCell(doc, { x: x + width * 0.6, y: ry, width: width * 0.4, height: rowH, text: r.value, fill, textColor: "#000000", bold: !!r.highlighted, fontSize: TACHO_FONT_SIZE });
+    ry += rowH;
   }
-  return ry - y;
+  return maxHeight;
 }
 
 function drawImage(doc, base64, x, y, width, height) {
