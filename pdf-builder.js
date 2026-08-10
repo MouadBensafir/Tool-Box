@@ -6,11 +6,11 @@
 const PDFDocument = require("pdfkit");
 
 const PAGE_MARGIN = 0;
-const HEADER_FONT_SIZE = 8;
-const ROW_HEIGHT = 22;
+const HEADER_FONT_SIZE = 11;
+const ROW_HEIGHT = 34;
 const TACHO_COL_WIDTH = 170;
 const TACHO_ROW_HEIGHT = 16;
-const GAP = 8;
+const GAP = 0;
 
 function drawCell(doc, { x, y, width, height, text, fill, textColor, bold }) {
   doc.save();
@@ -72,7 +72,12 @@ function drawImage(doc, base64, x, y, width, height) {
   if (!base64 || width <= 0 || height <= 0) return;
   try {
     const buf = Buffer.from(base64, "base64");
-    doc.image(buf, x, y, { fit: [width, height], align: "center", valign: "center" });
+    // Explicit width/height (not "fit") stretches the image to fill the box
+    // exactly, ignoring its original aspect ratio -- "fit" preserves aspect
+    // and letterboxes, leaving white bars on whichever axis doesn't match.
+    // Matches the "stretch" choice already made for this same screenshot in
+    // the original Fusion json-to-pdf node, for the same reason.
+    doc.image(buf, x, y, { width, height });
   } catch (e) {
     doc.fontSize(10).fillColor("#999999").text("Capture d'écran indisponible.", x, y, { width, align: "center" });
   }
