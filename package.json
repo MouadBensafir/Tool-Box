@@ -1,7 +1,7 @@
 {
-  "name": "vitesse-violation-processor",
-  "version": "1.0.0",
-  "description": "External processing service for EXCES DE VITESSE: handles the per-violation loop (tachograph + positions fetch, OBC analysis, screenshot capture) outside Fusion AI's stateful execution model, to avoid the memory ceiling that crashes the Fusion workflow on large batches.",
+  "name": "tool-box",
+  "version": "2.0.0",
+  "description": "Report email construction and sending for 3 AXIS / EXCES DE VITESSE / FREINAGE. Fusion AI keeps all analysis (auth, dedup, OBC thresholds, tachograph, screenshot capture, recap/xlsx, Drive update); this service takes the already-analyzed records and builds the email body, builds the multi-page PDF when there's more than one record, and sends via Gmail -- offloading the memory-heavy report-formatting step from Fusion's stateful execution model.",
   "type": "commonjs",
   "main": "server.js",
   "scripts": {
@@ -11,6 +11,11 @@
     "node": ">=18"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "google-auth-library": "^11.0.0",
+    "pdfkit": "^0.19.1"
+  },
+  "devDependencies": {
+    "pdf-parse": "^2.4.5"
   }
 }
