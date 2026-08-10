@@ -226,8 +226,86 @@ async function run() {
     }
   });
 
+  // ---- browserless-capture.js ----
+  const { captureScreenshot, captureAllScreenshots, SCRIPT_BUILDERS } = require("./browserless-capture");
+  const { buildPlaywrightScript3axis, buildPlaywrightScriptVitesse, buildPlaywrightScriptFreinage } = require("./playwright-scripts");
+
+  check("playwright-scripts: all 3 builders produce a script containing the auth token and plate", () => {
+    for (const [reportType, fn] of Object.entries({ "3AXIS": buildPlaywrightScript3axis, VITESSE: buildPlaywrightScriptVitesse, FREINAGE: buildPlaywrightScriptFreinage })) {
+      const script = fn(item3axis, "TOKEN_XYZ");
+      assert.ok(script.includes("TOKEN_XYZ"), `${reportType} script missing the auth token`);
+      assert.ok(script.includes(item3axis["Immatriculation"]), `${reportType} script missing the plate`);
+      assert.ok(script.includes("export default async"), `${reportType} script missing the Browserless function wrapper`);
+    }
+  });
+
+  await check("captureScreenshot: posts the built script to Browserless with the token in the URL, returns the image", async () => {
+    let capturedUrl, capturedBody;
+    const fakeFetch = async (url, opts) => {
+      capturedUrl = url; capturedBody = JSON.parse(opts.body);
+      return { ok: true, json: async () => ({ image: "BASE64IMAGE" }) };
+    };
+    const image = await captureScreenshot({ item: item3axis, authToken: "TOKEN_XYZ", reportType: "3AXIS" }, fakeFetch);
+    assert.strictEqual(image, "BASE64IMAGE");
+    assert.ok(capturedUrl.startsWith("https://chrome.browserless.io/function?token="));
+    assert.ok(typeof capturedBody.code === "string" && capturedBody.code.includes("TOKEN_XYZ"));
+  });
+  await check("captureScreenshot: unknown reportType throws before ever calling fetch", async () => {
+    let called = false;
+    const fakeFetch = async () => { called = true; return { ok: true, json: async () => ({}) }; };
+    await assert.rejects(captureScreenshot({ item: item3axis, authToken: "T", reportType: "NOPE" }, fakeFetch), /No Playwright script builder/);
+    assert.strictEqual(called, false);
+  });
+  await check("captureScreenshot: non-ok Browserless response throws with status+body", async () => {
+    const fakeFetch = async () => ({ ok: false, status: 502, text: async () => "bad gateway" });
+    await assert.rejects(
+      captureScreenshot({ item: item3axis, authToken: "T", reportType: "3AXIS" }, fakeFetch),
+      /Browserless capture failed \(502\): bad gateway/
+    );
+  });
+  await check("captureAllScreenshots: captures records missing a screenshot, skips ones that already have one", async () => {
+    let calls = 0;
+    const fakeFetch = async () => { calls++; return { ok: true, json: async () => ({ image: `IMG_${calls}` }) }; };
+    const records = [
+      { item: item3axis },
+      { item: { ...item3axis, Immatriculation: "X" }, screenshot: "ALREADY_HAVE_ONE" },
+    ];
+    const out = await captureAllScreenshots(records, { authToken: "T", reportType: "3AXIS" }, fakeFetch);
+    assert.strictEqual(calls, 1, "should only call Browserless for the record missing a screenshot");
+    assert.strictEqual(out[0].screenshot, "IMG_1");
+    assert.strictEqual(out[1].screenshot, "ALREADY_HAVE_ONE");
+  });
+  await check("captureAllScreenshots: one record's capture failure doesn't abort the batch", async () => {
+    let calls = 0;
+    const fakeFetch = async () => {
+      calls++;
+      if (calls === 1) return { ok: false, status: 500, text: async () => "boom" };
+      return { ok: true, json: async () => ({ image: "OK" }) };
+    };
+    const records = [{ item: item3axis }, { item: { ...item3axis, Immatriculation: "X" } }];
+    const out = await captureAllScreenshots(records, { authToken: "T", reportType: "3AXIS" }, fakeFetch);
+    assert.strictEqual(out[0].screenshot, null);
+    assert.ok(out[0].captureError.includes("boom"));
+    assert.strictEqual(out[1].screenshot, "OK");
+  });
+
   // ---- server.js: buildReport (pure, no network) + HTTP endpoint validation ----
   const { app, buildReport } = require("./server");
+
+  await check("buildReport: captures missing screenshots via the injected fetch before building the PDF", async () => {
+    let calls = 0;
+    const fakeFetch = async () => { calls++; return { ok: true, json: async () => ({ image: `CAPTURED_${calls}` }) }; };
+    const { attachments } = await buildReport({
+      reportType: "3AXIS", recipientType: "TEMM", hour: "14", authToken: "TOKEN",
+      records: [
+        { item: item3axis },
+        { item: { ...item3axis, Immatriculation: "X" } },
+      ],
+      xlsxAttachment: null,
+    }, fakeFetch);
+    assert.strictEqual(calls, 2);
+    assert.ok(attachments.some(a => a.mimeType === "application/pdf"));
+  });
 
   await check("buildReport: 3AXIS TEMM, 1 record -> no PDF, xlsx attached", async () => {
     const { subject, body, attachments } = await buildReport({
@@ -294,6 +372,21 @@ async function run() {
       assert.strictEqual(res.status, 400);
       const json = await res.json();
       assert.ok(json.error.includes("reportType"));
+    } finally {
+      server.close();
+    }
+  });
+  await check("POST /send-report: records missing screenshots with no authToken -> 400", async () => {
+    const server = app.listen(0);
+    try {
+      const port = server.address().port;
+      const res = await fetch(`http://localhost:${port}/send-report`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reportType: "3AXIS", recipientType: "TEMM", to: ["a@b.com"], records: [{ item: item3axis }] }),
+      });
+      assert.strictEqual(res.status, 400);
+      const json = await res.json();
+      assert.ok(json.error.includes("authToken"));
     } finally {
       server.close();
     }

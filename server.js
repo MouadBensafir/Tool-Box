@@ -1,16 +1,17 @@
 // =====================================================================
-// Tool-Box -- email construction + sending for the ETAT GPS report
-// workflows (3 AXIS, EXCES DE VITESSE, FREINAGE).
+// Tool-Box -- screenshot capture + email construction + sending for the
+// ETAT GPS report workflows (3 AXIS, EXCES DE VITESSE, FREINAGE).
 //
-// Fusion AI stays responsible for EVERYTHING analysis-related: auth,
-// extraction, dedup, OBC threshold analysis, tachograph fetch, screenshot
-// capture, recap building, and the xlsx generation + Google Drive update.
-// This service only takes the already-analyzed records and "handles the
-// rest": building the email body (single block vs. summary table + PDF,
-// per the established rules), building the multi-page PDF when needed, and
-// sending the Gmail message. This replaces the older /process-violations
-// endpoint, which is no longer used -- Tool-Box no longer talks to Mix
-// Telematics or Browserless at all.
+// Fusion AI stays responsible for analysis: auth, extraction, dedup, OBC
+// threshold analysis, tachograph fetch, recap building, and the xlsx
+// generation + Google Drive update. This service takes the already-
+// analyzed records (one recipient's worth per call -- TEMM or a
+// transporteur) and "handles the rest": capturing each record's map
+// screenshot via Browserless (moved here so screenshots never enter
+// Fusion's per-run memory accumulator at all -- Fusion only ever sees the
+// final send result), building the email body (single block vs. summary
+// table + PDF, per the established rules), building the multi-page PDF
+// when needed, and sending the Gmail message.
 // =====================================================================
 
 const express = require("express");
@@ -18,6 +19,7 @@ const { getReportConfig } = require("./report-config");
 const { buildMiddleHtml } = require("./html-builder");
 const { buildPdfBuffer } = require("./pdf-builder");
 const { sendGmail } = require("./gmail-client");
+const { captureAllScreenshots } = require("./browserless-capture");
 
 const app = express();
 app.use(express.json({ limit: "50mb" }));
@@ -32,13 +34,15 @@ const GMAIL_REFRESH_TOKEN = process.env.GMAIL_REFRESH_TOKEN;
 // destinataire par appel -- TEMM ou un transporteur -- Fusion continue de
 // gérer le groupement par transporteur et la boucle, ce n'est pas un
 // traitement coûteux en mémoire).
-async function buildReport(payload) {
-  const { reportType, recipientType, groupe, hour, isMorningCatchup, monthFr, records, xlsxAttachment } = payload;
+async function buildReport(payload, fetchImpl) {
+  const { reportType, recipientType, groupe, hour, isMorningCatchup, monthFr, authToken, xlsxAttachment } = payload;
   const config = getReportConfig(reportType);
 
   if (recipientType === "TRANSPORTEUR" && !config.supportsTransporteur) {
     throw new Error(`${reportType} does not support a TRANSPORTEUR recipient`);
   }
+
+  const records = await captureAllScreenshots(payload.records, { authToken, reportType }, fetchImpl);
 
   const { middleHtml, needsPdf } = buildMiddleHtml(records, config);
 
@@ -95,6 +99,9 @@ app.post("/send-report", async (req, res) => {
   }
   if (!Array.isArray(records)) {
     return res.status(400).json({ error: "Missing records array" });
+  }
+  if (records.length > 0 && records.some(r => !r.screenshot) && !req.body.authToken) {
+    return res.status(400).json({ error: "Missing authToken (required to capture screenshots for records that don't already have one)" });
   }
   if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET || !GMAIL_REFRESH_TOKEN) {
     return res.status(500).json({ error: "Gmail credentials not configured on the service" });

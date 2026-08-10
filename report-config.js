@@ -100,7 +100,7 @@ const REPORT_CONFIGS = {
     eventCols: COLS_OBC,
     hasTacho: false,
     hasTitle: true,
-    imageMime: "image/png",
+    imageMime: "image/jpeg",
     supportsTransporteur: false,
 
     subjectTemm: ({ hour }) => `RAPPORT SUIVI DES INFRACTIONS FREINAGE ET ACCELERATION EXCESSIFS ${hour}H`,
