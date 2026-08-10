@@ -435,18 +435,22 @@ function buildPlaywrightScript3axis(item, authToken) {
       }
     } catch (e) {}
     
-    // ─── STAGE 9: CAPTURE CROPPED MAP ONLY ────────────────────────────────────
+    // ─── STAGE 9: CAPTURE AGGRESSIVELY CROPPED MAP ────────────────────────────
     const mapClip = await page.evaluate(() => {
       const mapEl = document.querySelector('#map-container, .right-pane, div[class*="map-container"], .leaflet-container') || document.body;
       const rect = mapEl.getBoundingClientRect();
-      const bottomCut = 100; 
-      const topBuffer = 5;
-      const sideBuffer = 2; 
+
+      // Aggressive cuts to match the red box in the reference image
+      // Cutting roughly 20% off the top, 30% off the bottom, and 5% off the sides
+      const topCut = rect.height * 0.20;
+      const bottomCut = rect.height * 0.30;
+      const sideCut = rect.width * 0.05;
+
       return {
-        x: Math.round(rect.left + sideBuffer),
-        y: Math.round(rect.top + topBuffer),
-        width: Math.round(rect.width - (sideBuffer * 2)),
-        height: Math.round(rect.height - bottomCut - topBuffer)
+        x: Math.round(rect.left + sideCut),
+        y: Math.round(rect.top + topCut),
+        width: Math.round(rect.width - (sideCut * 2)),
+        height: Math.round(rect.height - topCut - bottomCut)
       };
     });
 

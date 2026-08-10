@@ -106,3 +106,12 @@ their new `Envoyer Rapport...` http-request nodes matches.
   quoted `Content-Disposition` header rather than full RFC 2231 encoding —
   works with Gmail/most clients in practice, flagged here in case a client
   ever mangles one.
+- Screenshot de-duplication (`browserless-capture.js`) is in-memory, scoped
+  to a single running instance, with a 30-minute TTL — the same event
+  captured for TEMM and for a transporteur (they overlap: a transporteur's
+  records are a subset of TEMM's) is only bought from Browserless once,
+  including when both calls are genuinely concurrent. This only holds as
+  long as Tool-Box runs as a single instance without restarting mid-run,
+  which matches how it's deployed today; if it's ever horizontally scaled,
+  the cache would need to move to something shared (Redis) to keep working
+  across instances.

@@ -5,7 +5,7 @@
 // main.
 const PDFDocument = require("pdfkit");
 
-const PAGE_MARGIN = 24;
+const PAGE_MARGIN = 0;
 const HEADER_FONT_SIZE = 8;
 const ROW_HEIGHT = 22;
 const TACHO_COL_WIDTH = 170;

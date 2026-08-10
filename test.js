@@ -227,7 +227,7 @@ async function run() {
   });
 
   // ---- browserless-capture.js ----
-  const { captureScreenshot, captureAllScreenshots, SCRIPT_BUILDERS } = require("./browserless-capture");
+  const { captureScreenshot, captureAllScreenshots, SCRIPT_BUILDERS, _resetCacheForTests } = require("./browserless-capture");
   const { buildPlaywrightScript3axis, buildPlaywrightScriptVitesse, buildPlaywrightScriptFreinage } = require("./playwright-scripts");
 
   check("playwright-scripts: all 3 builders produce a script containing the auth token and plate", () => {
@@ -264,6 +264,7 @@ async function run() {
     );
   });
   await check("captureAllScreenshots: captures records missing a screenshot, skips ones that already have one", async () => {
+    _resetCacheForTests();
     let calls = 0;
     const fakeFetch = async () => { calls++; return { ok: true, json: async () => ({ image: `IMG_${calls}` }) }; };
     const records = [
@@ -276,6 +277,7 @@ async function run() {
     assert.strictEqual(out[1].screenshot, "ALREADY_HAVE_ONE");
   });
   await check("captureAllScreenshots: one record's capture failure doesn't abort the batch", async () => {
+    _resetCacheForTests();
     let calls = 0;
     const fakeFetch = async () => {
       calls++;
@@ -289,10 +291,73 @@ async function run() {
     assert.strictEqual(out[1].screenshot, "OK");
   });
 
+  // ---- browserless-capture.js: cross-call de-duplication (TEMM vs transporteur sharing the same event) ----
+  await check("captureAllScreenshots: a SECOND call for the same event reuses the completed capture, no new fetch", async () => {
+    _resetCacheForTests();
+    let calls = 0;
+    const fakeFetch = async () => { calls++; return { ok: true, json: async () => ({ image: "SHARED_IMG" }) }; };
+    const first = await captureAllScreenshots([{ item: item3axis }], { authToken: "T", reportType: "3AXIS" }, fakeFetch);
+    const second = await captureAllScreenshots([{ item: item3axis }], { authToken: "T", reportType: "3AXIS" }, fakeFetch);
+    assert.strictEqual(calls, 1, "second call should reuse the cached screenshot, not hit Browserless again");
+    assert.strictEqual(first[0].screenshot, "SHARED_IMG");
+    assert.strictEqual(second[0].screenshot, "SHARED_IMG");
+  });
+
+  await check("captureAllScreenshots: TWO CONCURRENT calls for the same event only trigger ONE Browserless fetch", async () => {
+    _resetCacheForTests();
+    let calls = 0;
+    let resolveFetch;
+    const fakeFetch = async () => {
+      calls++;
+      // Hang until we explicitly resolve it, so both concurrent callers are
+      // guaranteed to be mid-flight (racing) before either completes.
+      await new Promise((resolve) => { resolveFetch = resolve; });
+      return { ok: true, json: async () => ({ image: "RACE_IMG" }) };
+    };
+    const p1 = captureAllScreenshots([{ item: item3axis }], { authToken: "T", reportType: "3AXIS" }, fakeFetch);
+    // Let p1's synchronous setup (cache miss check + inFlight registration) run before starting p2.
+    await new Promise((r) => setImmediate(r));
+    const p2 = captureAllScreenshots([{ item: item3axis }], { authToken: "T", reportType: "3AXIS" }, fakeFetch);
+    await new Promise((r) => setImmediate(r));
+    resolveFetch();
+    const [r1, r2] = await Promise.all([p1, p2]);
+    assert.strictEqual(calls, 1, "concurrent requests for the same event must share one in-flight capture");
+    assert.strictEqual(r1[0].screenshot, "RACE_IMG");
+    assert.strictEqual(r2[0].screenshot, "RACE_IMG");
+  });
+
+  await check("captureAllScreenshots: a FAILED capture is never cached -- the next call gets a fresh attempt", async () => {
+    _resetCacheForTests();
+    let calls = 0;
+    const fakeFetch = async () => {
+      calls++;
+      if (calls === 1) return { ok: false, status: 500, text: async () => "transient" };
+      return { ok: true, json: async () => ({ image: "RETRY_OK" }) };
+    };
+    const first = await captureAllScreenshots([{ item: item3axis }], { authToken: "T", reportType: "3AXIS" }, fakeFetch);
+    const second = await captureAllScreenshots([{ item: item3axis }], { authToken: "T", reportType: "3AXIS" }, fakeFetch);
+    assert.strictEqual(first[0].screenshot, null);
+    assert.strictEqual(second[0].screenshot, "RETRY_OK");
+    assert.strictEqual(calls, 2, "a failed capture must not be cached -- the second call should retry, not reuse the failure");
+  });
+
+  await check("captureAllScreenshots: different events (different plate) are never conflated", async () => {
+    _resetCacheForTests();
+    let calls = 0;
+    const fakeFetch = async () => { calls++; return { ok: true, json: async () => ({ image: `IMG_${calls}` }) }; };
+    const out = await captureAllScreenshots(
+      [{ item: item3axis }, { item: { ...item3axis, Immatriculation: "DIFFERENT-PLATE" } }],
+      { authToken: "T", reportType: "3AXIS" }, fakeFetch
+    );
+    assert.strictEqual(calls, 2);
+    assert.notStrictEqual(out[0].screenshot, out[1].screenshot);
+  });
+
   // ---- server.js: buildReport (pure, no network) + HTTP endpoint validation ----
   const { app, buildReport } = require("./server");
 
   await check("buildReport: captures missing screenshots via the injected fetch before building the PDF", async () => {
+    _resetCacheForTests();
     let calls = 0;
     const fakeFetch = async () => { calls++; return { ok: true, json: async () => ({ image: `CAPTURED_${calls}` }) }; };
     const { attachments } = await buildReport({
