@@ -31,6 +31,17 @@ async function captureScreenshot({ item, authToken, reportType }, fetchImpl = fe
     throw new Error(`Browserless capture failed (${res.status}): ${text}`);
   }
   const data = await res.json();
+
+  // The Browserless *HTTP call* can succeed (200) while the script itself
+  // reports failure in its JSON body -- e.g. the 3AXIS script's early exit
+  // when the target event isn't found on the page returns
+  // {success:false, message:"..."} with a 200 status. Treating that as "no
+  // image, but otherwise fine" silently marked the violation as handled
+  // (recap dedup would then never retry it). Must throw here so this
+  // propagates as a real capture failure.
+  if (data && data.success === false) {
+    throw new Error(`Browserless script reported failure: ${data.message || "unknown reason"}`);
+  }
   return data && data.image ? data.image : null;
 }
 

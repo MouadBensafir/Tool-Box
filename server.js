@@ -124,6 +124,44 @@ app.post("/send-report", async (req, res) => {
   }
 });
 
+// Capture-only endpoint: lets Fusion get per-record capture success/failure
+// BEFORE committing anything to the recap, so a record whose screenshot
+// capture fails (e.g. the target event wasn't found on the Mix page) can be
+// excluded from the recap and retried on the next run instead of silently
+// being marked "handled" forever. Fusion calls this first, filters the
+// results, THEN builds the recap/xlsx and calls /send-report with
+// screenshots already attached (so /send-report never re-captures them).
+app.post("/capture-screenshots", async (req, res) => {
+  if (API_KEY && req.get("X-API-Key") !== API_KEY) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const { reportType, authToken, records } = req.body || {};
+  if (!reportType || typeof reportType !== "string") {
+    return res.status(400).json({ error: "Missing reportType" });
+  }
+  if (!authToken || typeof authToken !== "string") {
+    return res.status(400).json({ error: "Missing authToken" });
+  }
+  if (!Array.isArray(records)) {
+    return res.status(400).json({ error: "Missing records array" });
+  }
+
+  try {
+    const captured = await captureAllScreenshots(records, { authToken, reportType });
+    const results = captured.map((r) => ({
+      item: r.item,
+      screenshot: r.screenshot,
+      tachoTable: r.tachoTable || null,
+      success: !r.captureError,
+      error: r.captureError || null,
+    }));
+    res.json({ results });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get("/health", (req, res) => res.json({ status: "ok" }));
 
 if (require.main === module) {

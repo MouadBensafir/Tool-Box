@@ -257,6 +257,14 @@ function buildPlaywrightScript3axis(item, authToken) {
     const menuOpened = stage4Result.menuOpened;
     const targetEventIndex = stage4Result.targetIndex;
 
+    // ─── EARLY EXIT: IF EVENT IS NOT FOUND ────────────────────────────────────
+    if (!menuOpened) {
+      return {
+        success: false,
+        message: "Target event not found in the current trip data."
+      };
+    }
+
     let mapClicked = false;
     if (menuOpened) {
       await new Promise(r => setTimeout(r, 500));
@@ -462,6 +470,7 @@ function buildPlaywrightScript3axis(item, authToken) {
     });
 
     return {
+      success: true,
       image: screenshotBase64
     };
   };
