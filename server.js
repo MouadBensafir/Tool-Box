@@ -1,17 +1,18 @@
 // =====================================================================
-// Tool-Box -- screenshot capture + email construction + sending for the
-// ETAT GPS report workflows (3 AXIS, EXCES DE VITESSE, FREINAGE).
+// Tool-Box -- email construction + sending for the ETAT GPS report
+// workflows (3 AXIS, EXCES DE VITESSE, FREINAGE).
 //
-// Fusion AI stays responsible for analysis: auth, extraction, dedup, OBC
-// threshold analysis, tachograph fetch, recap building, and the xlsx
+// Fusion AI stays responsible for analysis (auth, extraction, dedup, OBC
+// threshold analysis, tachograph fetch), screenshot capture (Playwright +
+// Browserless, per item, in its own loop), recap building, and the xlsx
 // generation + Google Drive update. This service takes the already-
-// analyzed records (one recipient's worth per call -- TEMM or a
-// transporteur) and "handles the rest": capturing each record's map
-// screenshot via Browserless (moved here so screenshots never enter
-// Fusion's per-run memory accumulator at all -- Fusion only ever sees the
-// final send result), building the email body (single block vs. summary
-// table + PDF, per the established rules), building the multi-page PDF
-// when needed, and sending the Gmail message.
+// analyzed, already-captured records (one recipient's worth per call --
+// TEMM or a transporteur) and "handles the rest": building the email body
+// (single block vs. summary table + PDF, per the established rules),
+// building the multi-page PDF when needed, and sending the Gmail message.
+// captureAllScreenshots is kept only as a defensive fallback for any
+// record that arrives without a screenshot -- it is a no-op skip for
+// every record Fusion already captured.
 // =====================================================================
 
 const express = require("express");
@@ -121,44 +122,6 @@ app.post("/send-report", async (req, res) => {
     res.json({ success: true, messageId: result.id, subject });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// Capture-only endpoint: lets Fusion get per-record capture success/failure
-// BEFORE committing anything to the recap, so a record whose screenshot
-// capture fails (e.g. the target event wasn't found on the Mix page) can be
-// excluded from the recap and retried on the next run instead of silently
-// being marked "handled" forever. Fusion calls this first, filters the
-// results, THEN builds the recap/xlsx and calls /send-report with
-// screenshots already attached (so /send-report never re-captures them).
-app.post("/capture-screenshots", async (req, res) => {
-  if (API_KEY && req.get("X-API-Key") !== API_KEY) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
-  const { reportType, authToken, records } = req.body || {};
-  if (!reportType || typeof reportType !== "string") {
-    return res.status(400).json({ error: "Missing reportType" });
-  }
-  if (!authToken || typeof authToken !== "string") {
-    return res.status(400).json({ error: "Missing authToken" });
-  }
-  if (!Array.isArray(records)) {
-    return res.status(400).json({ error: "Missing records array" });
-  }
-
-  try {
-    const captured = await captureAllScreenshots(records, { authToken, reportType });
-    const results = captured.map((r) => ({
-      item: r.item,
-      screenshot: r.screenshot,
-      tachoTable: r.tachoTable || null,
-      success: !r.captureError,
-      error: r.captureError || null,
-    }));
-    res.json({ results });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
   }
 });
 
