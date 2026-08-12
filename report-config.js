@@ -39,6 +39,18 @@ const COLS_OBC = [
   ["Nbre d'occurrences", (it) => it["Nbre d'occurrences"], 8],
 ];
 
+const COLS_DECONNEXION = [
+  ["Nom du site de l'actif", (it) => it["Nom du site de l'actif"], 16],
+  ["Description du véhicule", (it) => it["Description du vehicule"], 22],
+  ["Immatriculation", (it) => it["Immatriculation"], 14],
+  ["Chauffeur", (it) => it["Chauffeur"], 16],
+  ["Description de l'événement", (it) => it["Description de l'évenement"], 26],
+  ["Start date", (it) => it["Start date"], 10],
+  ["Heure de début", (it) => it["Heure de début"], 10],
+  ["Heure de fin", (it) => it["Heure de fin"], 10],
+  ["Nbre d'occurrences", (it) => it["Nbre d'occurrences"], 8],
+];
+
 const SIGNATURE_HTML = `
 <table style="font-family:Arial,sans-serif;font-size:12px;margin-top:10px;">
   <tr>
@@ -56,6 +68,25 @@ const SIGNATURE_HTML = `
 </table>`;
 
 const REPORT_CONFIGS = {
+  "DECONNEXION": {
+    label: "DECONNEXION J-1",
+    eventCols: COLS_DECONNEXION,
+    hasTacho: false,
+    hasTitle: false,
+    imageMime: "image/jpeg",
+    supportsTransporteur: true,
+
+    subjectTemm: () => "RAPPORT DE DECONNEXION J-1",
+    subjectTransporteur: ({ groupe }) => `RAPPORT DE DECONNEXION J-1 / ${groupe}`,
+    pdfFileName: ({ monthFr, groupe }) => `RAPPORT DE DECONNEXION J-1 ${monthFr}${groupe ? ` ${groupe}` : ""}.pdf`,
+
+    bodyTemm: ({ middleHtml, hasRecords }) => hasRecords
+      ? `Bonjour,<br><br>Veuillez trouver ci-dessous le rapport suivi des événements de déconnexion J-1:<br><br>${middleHtml}<br><br>Cordialement.`
+      : `Bonjour,<br><br>Je souhaite vous informer que nous n'avons aucune déconnexion signalée pour la période J-1.<br><br>Cordialement.`,
+    bodyTransporteur: ({ middleHtml, groupe }) =>
+      `Bonjour,<br><br>Veuillez trouver ci-dessous le rapport suivi des événements de déconnexion J-1 pour ${escapeHtml(groupe)} :<br><br>${middleHtml}<br><br>Cordialement.`,
+  },
+
   "3AXIS": {
     label: "3 AXIS POSSIBLE ACCIDENT",
     eventCols: COLS_3AXIS,

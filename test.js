@@ -425,6 +425,38 @@ async function run() {
     assert.ok(body.includes("mesures disciplinaires"));
   });
 
+  await check("buildReport: DECONNEXION TEMM, 1 record -> real subject/body, xlsx attached", async () => {
+    const itemDeco = {
+      "Nom du site de l'actif": "STMF", "Description du vehicule": "MA21195 HCL", "Immatriculation": "83175-A-13",
+      "ID d'actif": "373", "Chauffeur": "AZZEDINE MAZYANE", "Description de l'évenement": "TEG504 - Deconnexion Batterie Standard",
+      "Start date": "08/08/2026", "Heure de début": "12:47:50", "Heure de fin": "12:47:51", "Nbre d'occurrences": 1,
+    };
+    const { subject, body, attachments } = await buildReport({
+      reportType: "DECONNEXION", recipientType: "TEMM",
+      records: [{ item: itemDeco, screenshot: TINY_JPEG_BASE64 }],
+      xlsxAttachment: { fileName: "recap.xlsx", base64: "WFla" },
+    });
+    assert.strictEqual(subject, "RAPPORT DE DECONNEXION J-1");
+    assert.ok(body.includes("rapport suivi des événements de déconnexion J-1"));
+    assert.ok(body.includes("AZZEDINE MAZYANE"));
+    assert.ok(body.includes("STMF"));
+    assert.strictEqual(attachments.length, 1, "1 record -> no PDF, just the xlsx");
+  });
+
+  await check("buildReport: DECONNEXION TEMM, 0 records -> no-deconnexion body", async () => {
+    const { body } = await buildReport({ reportType: "DECONNEXION", recipientType: "TEMM", records: [], xlsxAttachment: null });
+    assert.ok(body.includes("aucune déconnexion signalée"));
+  });
+
+  await check("buildReport: DECONNEXION TRANSPORTEUR, subject names the site", async () => {
+    const { subject } = await buildReport({
+      reportType: "DECONNEXION", recipientType: "TRANSPORTEUR", groupe: "STMF",
+      records: [{ item: { "Nom du site de l'actif": "STMF" }, screenshot: TINY_JPEG_BASE64 }],
+      xlsxAttachment: null,
+    });
+    assert.strictEqual(subject, "RAPPORT DE DECONNEXION J-1 / STMF");
+  });
+
   await check("buildReport: FREINAGE rejects TRANSPORTEUR recipientType", async () => {
     await assert.rejects(
       buildReport({ reportType: "FREINAGE", recipientType: "TRANSPORTEUR", groupe: "X", records: [] }),
