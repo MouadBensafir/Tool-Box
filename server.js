@@ -60,7 +60,7 @@ async function buildReport(payload, fetchImpl) {
     });
   } else {
     subject = config.subjectTemm({ hour, isMorningCatchup });
-    body = config.bodyTemm({ middleHtml, hasRecords: records.length > 0 });
+    body = config.bodyTemm({ middleHtml, hasRecords: records.length > 0, records });
   }
 
   const attachments = [];

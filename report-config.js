@@ -106,8 +106,21 @@ const REPORT_CONFIGS = {
     subjectTemm: ({ hour }) => `RAPPORT SUIVI DES INFRACTIONS FREINAGE ET ACCELERATION EXCESSIFS ${hour}H`,
     pdfFileName: ({ monthFr }) => `RAPPORT FREINAGE ET ACCELERATION EXCESSIFS.pdf`,
 
-    bodyTemm: ({ middleHtml, hasRecords }) =>
-      `Bonjour,<br><br>Veuillez trouver ci-dessous le rapport suivi des infractions freinage excessif et accélération excessive :<br><br>${hasRecords ? middleHtml : "<p><em>Aucune infraction confirmée pour cette période.</em></p>"}`,
+    bodyTemm: ({ middleHtml, hasRecords, records }) => {
+      if (!hasRecords) {
+        return `Bonjour,<br><br>Je souhaite vous informer que nous n'avons aucune infraction signalée concernant le rapport des Freinages excessifs et Accélération excessive .<br><br>Cordialement.`;
+      }
+      // Un seul enregistrement : message personnalisé nommant l'événement et
+      // le conducteur, comme demandé -- pas de sens à faire pareil pour
+      // plusieurs enregistrements (plusieurs événements/conducteurs
+      // différents), donc ce cas retombe sur l'intro générique ci-dessous.
+      if (records.length === 1) {
+        const evenement = escapeHtml(records[0].item?.["Description de l'événement"] || "");
+        const conducteur = escapeHtml(records[0].item?.["Conducteur"] || "");
+        return `Bonjour,<br><br>Nous souhaitons attirer votre attention sur une situation inquiétante  de ${evenement}  de la part du conducteur nommé :${conducteur}<br><br>Nous vous prions de nous fournir des explications concernant cet événement :<br><br>${middleHtml}<br><br>Cordialement.`;
+      }
+      return `Bonjour,<br><br>Veuillez trouver ci-dessous le rapport suivi des infractions freinage excessif et accélération excessive :<br><br>${middleHtml}<br><br>Cordialement,`;
+    },
   },
 };
 

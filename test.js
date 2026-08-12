@@ -428,8 +428,33 @@ async function run() {
       reportType: "FREINAGE", recipientType: "TEMM", hour: "14", records: [],
       xlsxAttachment: { fileName: "recap.xlsx", base64: "WFla" },
     });
-    assert.ok(body.includes("Aucune infraction confirmée"));
+    assert.ok(body.includes("nous n'avons aucune infraction signalée"));
     assert.strictEqual(attachments.length, 1);
+  });
+
+  await check("buildReport: FREINAGE TEMM, 1 record -> personalized body naming the event and driver", async () => {
+    const { body } = await buildReport({
+      reportType: "FREINAGE", recipientType: "TEMM", hour: "14",
+      records: [{ item: itemVitesse, screenshot: TINY_JPEG_BASE64 }],
+      xlsxAttachment: null,
+    });
+    assert.ok(body.includes("situation inquiétante"));
+    assert.ok(body.includes("Excès de vitesse"), "must name the specific event");
+    assert.ok(body.includes("NASRI TARIK"), "must name the specific driver");
+    assert.ok(body.includes("fournir des explications"));
+  });
+
+  await check("buildReport: FREINAGE TEMM, 2 records -> falls back to the generic multi-record intro, no single driver named", async () => {
+    const { body } = await buildReport({
+      reportType: "FREINAGE", recipientType: "TEMM", hour: "14",
+      records: [
+        { item: itemVitesse, screenshot: TINY_JPEG_BASE64 },
+        { item: { ...itemVitesse, Immatriculation: "X", Conducteur: "AUTRE CHAUFFEUR" }, screenshot: TINY_JPEG_BASE64 },
+      ],
+      xlsxAttachment: null,
+    });
+    assert.ok(body.includes("Veuillez trouver ci-dessous"));
+    assert.ok(!body.includes("situation inquiétante"));
   });
 
   // ---- HTTP endpoint validation (real request, no Gmail creds set -> 500 with clear error, not a crash) ----
