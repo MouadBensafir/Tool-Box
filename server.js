@@ -45,7 +45,13 @@ async function buildReport(payload, fetchImpl) {
 
   const records = await captureAllScreenshots(payload.records, { authToken, reportType }, fetchImpl);
 
-  const { middleHtml, needsPdf } = buildMiddleHtml(records, config);
+  // Le tachygraphe est un détail technique destiné à TEMM (supervision
+  // interne) -- le transporteur n'a besoin que du tableau + de la capture
+  // pour comprendre et expliquer l'événement, jamais du relevé seconde par
+  // seconde, même quand le type de rapport en a un (VITESSE, FREINAGE).
+  const middleConfig = recipientType === "TRANSPORTEUR" ? { ...config, hasTacho: false } : config;
+
+  const { middleHtml, needsPdf } = buildMiddleHtml(records, middleConfig);
 
   let subject, body;
   if (recipientType === "TRANSPORTEUR") {
@@ -72,7 +78,7 @@ async function buildReport(payload, fetchImpl) {
     });
   }
   if (needsPdf) {
-    const pdfBuffer = await buildPdfBuffer(records, config);
+    const pdfBuffer = await buildPdfBuffer(records, middleConfig);
     attachments.push({
       mimeType: "application/pdf",
       fileName: config.pdfFileName({ monthFr, groupe }),

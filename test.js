@@ -414,7 +414,7 @@ async function run() {
     assert.ok(!body.includes("<img"), "body should only show the summary table, not an embedded image, when >1 record");
   });
 
-  await check("buildReport: VITESSE TRANSPORTEUR, 1 record -> disciplinary body text + signature present", async () => {
+  await check("buildReport: VITESSE TRANSPORTEUR, 1 record -> disciplinary body text + signature present, NO tacho table (technical detail stays TEMM-only)", async () => {
     const { body } = await buildReport({
       reportType: "VITESSE", recipientType: "TRANSPORTEUR", groupe: "MEHARIS TE", hour: "14",
       records: [{ item: itemVitesse, screenshot: TINY_JPEG_BASE64, tachoTable: [{ datetime: "13:55:34", value: 92, highlighted: true }] }],
@@ -423,6 +423,37 @@ async function run() {
     assert.ok(body.includes("ABA TECHNOLOGY"));
     assert.ok(body.includes("NASRI TARIK"));
     assert.ok(body.includes("mesures disciplinaires"));
+    assert.ok(!body.includes("Horodatage"), "tacho table must not render for a transporteur email");
+  });
+
+  await check("buildReport: VITESSE TEMM, 1 record -> DOES show the tacho table", async () => {
+    const { body } = await buildReport({
+      reportType: "VITESSE", recipientType: "TEMM", hour: "14",
+      records: [{ item: itemVitesse, screenshot: TINY_JPEG_BASE64, tachoTable: [{ datetime: "13:55:34", value: 92, highlighted: true }] }],
+      xlsxAttachment: null,
+    });
+    assert.ok(body.includes("Horodatage"), "TEMM keeps the tacho table");
+  });
+
+  await check("buildReport: FREINAGE TRANSPORTEUR, 1 record -> NO tacho table even though FREINAGE hasTacho:true", async () => {
+    const itemFreinage = { "Description du bien": "MA23152 HCL", "Immatriculation": "7714-B-7", "Groupe": "SATDH T", "Conducteur": "EL HACHIMI ISMAIL", "Description de l'événement": "TEG203 - Freinage excessif 12km/h/s | Alert" };
+    const { body } = await buildReport({
+      reportType: "FREINAGE", recipientType: "TRANSPORTEUR", groupe: "SATDH T", hour: "14",
+      records: [{ item: itemFreinage, screenshot: TINY_JPEG_BASE64, tachoTable: [{ datetime: "07:31:49", value: 45, highlighted: true, highlightColor: "#FF0000" }] }],
+      xlsxAttachment: null,
+    });
+    assert.ok(!body.includes("Horodatage"), "tacho table must not render for a transporteur email");
+    assert.ok(body.includes("situation inquiétante"));
+  });
+
+  await check("buildReport: FREINAGE TEMM, 1 record -> DOES show the tacho table", async () => {
+    const itemFreinage = { "Description du bien": "MA23152 HCL", "Immatriculation": "7714-B-7", "Groupe": "SATDH T", "Conducteur": "EL HACHIMI ISMAIL", "Description de l'événement": "TEG203 - Freinage excessif 12km/h/s | Alert" };
+    const { body } = await buildReport({
+      reportType: "FREINAGE", recipientType: "TEMM", hour: "14",
+      records: [{ item: itemFreinage, screenshot: TINY_JPEG_BASE64, tachoTable: [{ datetime: "07:31:49", value: 45, highlighted: true, highlightColor: "#FF0000" }] }],
+      xlsxAttachment: null,
+    });
+    assert.ok(body.includes("Horodatage"), "TEMM keeps the tacho table");
   });
 
   await check("buildReport: DECONNEXION TEMM, 1 record -> real subject/body, xlsx attached", async () => {
