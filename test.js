@@ -61,10 +61,10 @@ async function run() {
     assert.strictEqual(c.hasTacho, true);
     assert.ok(c.subjectTransporteur({ hour: "14", groupe: "MEHARIS TE" }).includes("MEHARIS TE"));
   });
-  check("FREINAGE config: no transporteur support", () => {
+  check("FREINAGE config: no transporteur support, has tacho (anomaly rows, not the declared window)", () => {
     const c = getReportConfig("FREINAGE");
     assert.strictEqual(c.supportsTransporteur, false);
-    assert.strictEqual(c.hasTacho, false);
+    assert.strictEqual(c.hasTacho, true);
   });
 
   // ---- html-builder.js ----
@@ -79,13 +79,22 @@ async function run() {
     const html = buildSummaryTableHtml([item3axis, { ...item3axis, "Immatriculation": "X" }], getReportConfig("3AXIS").eventCols);
     assert.strictEqual((html.match(/<tr>/g) || []).length, 3);
   });
-  check("buildTachoTableHtml: highlighted rows get yellow fill", () => {
+  check("buildTachoTableHtml: highlighted rows default to yellow fill when no highlightColor given", () => {
     const html = buildTachoTableHtml([
       { datetime: "2026-08-10 13:55:34", value: 92, highlighted: true },
       { datetime: "2026-08-10 13:55:35", value: 91, highlighted: false },
     ], 700);
     assert.ok(html.includes("#ffff00"));
     assert.ok(html.includes("float:right"));
+  });
+  check("buildTachoTableHtml: highlighted rows use the per-row highlightColor when given (FREINAGE's red anomaly rows)", () => {
+    const html = buildTachoTableHtml([
+      { datetime: "2026-08-12 07:31:49", value: 45, highlighted: true, highlightColor: "#FF0000" },
+      { datetime: "2026-08-12 07:31:50", value: 31, highlighted: true, highlightColor: "#FF0000" },
+      { datetime: "2026-08-12 07:31:51", value: 20, highlighted: false },
+    ], 700);
+    assert.ok(html.includes("#FF0000"));
+    assert.ok(!html.includes("#ffff00"), "no row here should fall back to yellow");
   });
   check("buildTachoTableHtml: empty/null -> empty string", () => {
     assert.strictEqual(buildTachoTableHtml(null, 700), "");

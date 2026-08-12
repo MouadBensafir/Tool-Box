@@ -98,7 +98,7 @@ const REPORT_CONFIGS = {
   "FREINAGE": {
     label: "FREINAGE ET ACCELERATION EXCESSIFS",
     eventCols: COLS_OBC,
-    hasTacho: false,
+    hasTacho: true,
     hasTitle: true,
     imageMime: "image/jpeg",
     supportsTransporteur: false,

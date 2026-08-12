@@ -26,20 +26,24 @@ function buildSummaryTableHtml(items, eventCols) {
   );
 }
 
-// Tableau tachygraphe (VITESSE uniquement) : Fusion a déjà réduit les
+// Tableau tachygraphe (VITESSE et FREINAGE) : Fusion a déjà réduit les
 // relevés bruts à la fenêtre pertinente et calculé quelles lignes surligner
 // -- ce module se contente de les rendre en HTML, flottant à droite pour
-// venir se coller contre la capture d'écran.
+// venir se coller contre la capture d'écran. La couleur de surlignage vient
+// de chaque ligne (r.highlightColor, mise par Fusion) puisque sa
+// signification diffère selon le rapport : VITESSE marque les 2 bornes
+// déclarées du créneau retenu (jaune), FREINAGE marque la paire de relevés
+// qui a concrètement déclenché le seuil (rouge) -- défaut jaune si absent.
 function buildTachoTableHtml(tachoTable, imgHeight) {
   if (!tachoTable || !tachoTable.length) return "";
   const cellBase = "box-sizing:border-box;padding:5px 8px;border:1px solid #000000;text-align:center;font-family:Arial,sans-serif;font-size:12px;white-space:nowrap;";
   const th = `background-color:#000000;color:#ffffff;font-weight:bold;${cellBase}`;
   const tdWhite = `background-color:#ffffff;color:#000000;${cellBase}`;
-  const tdYellow = `background-color:#ffff00;color:#000000;font-weight:bold;${cellBase}`;
+  const tdHighlight = (color) => `background-color:${color};color:#000000;font-weight:bold;${cellBase}`;
   return (
     `<table height="${imgHeight}" style="float:right;box-sizing:border-box;border-collapse:collapse;height:${imgHeight}px;">` +
     `<thead><tr><th style="${th}">Horodatage</th><th style="${th}">Vitesse (km/h)</th></tr></thead>` +
-    `<tbody>${tachoTable.map(r => `<tr><td style="${r.highlighted ? tdYellow : tdWhite}">${escapeHtml(r.datetime)}</td><td style="${r.highlighted ? tdYellow : tdWhite}">${escapeHtml(r.value)}</td></tr>`).join("")}</tbody>` +
+    `<tbody>${tachoTable.map(r => { const style = r.highlighted ? tdHighlight(r.highlightColor || "#ffff00") : tdWhite; return `<tr><td style="${style}">${escapeHtml(r.datetime)}</td><td style="${style}">${escapeHtml(r.value)}</td></tr>`; }).join("")}</tbody>` +
     `</table>`
   );
 }

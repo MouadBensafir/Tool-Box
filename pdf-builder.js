@@ -48,10 +48,10 @@ function drawEventTable(doc, item, eventCols, x, y, totalWidth) {
   return ROW_HEIGHT * 2;
 }
 
-// Tableau tachygraphe (VITESSE uniquement), colonne étroite à gauche de
-// l'image -- les lignes surlignées (début/fin du créneau retenu) sont déjà
-// marquées par Fusion (`highlighted: true`), ce module se contente de les
-// peindre en jaune.
+// Tableau tachygraphe (VITESSE et FREINAGE), colonne étroite à gauche de
+// l'image -- les lignes surlignées sont déjà marquées par Fusion
+// (`highlighted: true`, `highlightColor`), ce module se contente de les
+// peindre dans la couleur fournie (jaune par défaut si absente).
 //
 // La hauteur de chaque ligne est calculée pour que le tableau remplisse
 // TOUJOURS exactement `maxHeight` (colonne étirée sur toute la hauteur
@@ -71,7 +71,7 @@ function drawTachoTable(doc, tachoTable, x, y, width, maxHeight) {
   const rowH = tachoTable.length > 0 ? bodyHeight / tachoTable.length : 0;
   let ry = y + headerH;
   for (const r of tachoTable) {
-    const fill = r.highlighted ? "#FFFF00" : "#FFFFFF";
+    const fill = r.highlighted ? (r.highlightColor || "#FFFF00") : "#FFFFFF";
     drawCell(doc, { x, y: ry, width: width * 0.6, height: rowH, text: r.datetime, fill, textColor: "#000000", bold: !!r.highlighted, fontSize: TACHO_FONT_SIZE });
     drawCell(doc, { x: x + width * 0.6, y: ry, width: width * 0.4, height: rowH, text: r.value, fill, textColor: "#000000", bold: !!r.highlighted, fontSize: TACHO_FONT_SIZE });
     ry += rowH;
