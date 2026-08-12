@@ -132,25 +132,33 @@ const REPORT_CONFIGS = {
     hasTacho: true,
     hasTitle: true,
     imageMime: "image/jpeg",
-    supportsTransporteur: false,
+    supportsTransporteur: true,
 
     subjectTemm: ({ hour }) => `RAPPORT SUIVI DES INFRACTIONS FREINAGE ET ACCELERATION EXCESSIFS ${hour}H`,
-    pdfFileName: ({ monthFr }) => `RAPPORT FREINAGE ET ACCELERATION EXCESSIFS.pdf`,
+    subjectTransporteur: ({ hour, groupe }) => `RAPPORT SUIVI DES INFRACTIONS FREINAGE ET ACCELERATION EXCESSIFS ${hour}H / ${groupe}`,
+    pdfFileName: ({ monthFr, groupe }) => `RAPPORT FREINAGE ET ACCELERATION EXCESSIFS${groupe ? ` ${groupe}` : ""}.pdf`,
 
-    bodyTemm: ({ middleHtml, hasRecords, records }) => {
-      if (!hasRecords) {
-        return `Bonjour,<br><br>Je souhaite vous informer que nous n'avons aucune infraction signalée concernant le rapport des Freinages excessifs et Accélération excessive .<br><br>Cordialement.`;
-      }
-      // Un seul enregistrement : message personnalisé nommant l'événement et
-      // le conducteur, comme demandé -- pas de sens à faire pareil pour
-      // plusieurs enregistrements (plusieurs événements/conducteurs
-      // différents), donc ce cas retombe sur l'intro générique ci-dessous.
+    // TEMM reçoit toujours le même message générique (report simple), qu'il
+    // y ait un ou plusieurs enregistrements -- le message personnalisé
+    // ("situation inquiétante"/nommant l'événement et le conducteur) est
+    // pour le transporteur, pas TEMM (cf. bodyTransporteur ci-dessous).
+    bodyTemm: ({ middleHtml, hasRecords }) => hasRecords
+      ? `Bonjour,<br><br>Veuillez trouver ci-dessous le rapport des Freinages excessifs et Accélération excessive:<br><br>${middleHtml}<br><br>Cordialement,`
+      : `Bonjour,<br><br>Je souhaite vous informer que nous n'avons aucune infraction signalée concernant le rapport des Freinages excessifs et Accélération excessive .<br><br>Cordialement.`,
+
+    // Le transporteur n'a jamais 0 enregistrement (un groupe n'existe que
+    // s'il a au moins une infraction retenue ce run, cf. "Groupes
+    // Distincts"). Un seul enregistrement : message personnalisé nommant
+    // l'événement et le conducteur -- pas de sens à faire pareil pour
+    // plusieurs enregistrements différents, donc ce cas retombe sur l'intro
+    // générique ci-dessous.
+    bodyTransporteur: ({ middleHtml, groupe, records }) => {
       if (records.length === 1) {
         const evenement = escapeHtml(records[0].item?.["Description de l'événement"] || "");
         const conducteur = escapeHtml(records[0].item?.["Conducteur"] || "");
         return `Bonjour,<br><br>Nous souhaitons attirer votre attention sur une situation inquiétante  de ${evenement}  de la part du conducteur nommé :${conducteur}<br><br>Nous vous prions de nous fournir des explications concernant cet événement :<br><br>${middleHtml}<br><br>Cordialement.`;
       }
-      return `Bonjour,<br><br>Veuillez trouver ci-dessous le rapport suivi des infractions freinage excessif et accélération excessive :<br><br>${middleHtml}<br><br>Cordialement,`;
+      return `Bonjour,<br><br>Veuillez trouver ci-dessous le rapport suivi des infractions freinage excessif et accélération excessive pour ${escapeHtml(groupe)} :<br><br>${middleHtml}<br><br>Cordialement,`;
     },
   },
 };

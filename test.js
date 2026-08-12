@@ -61,9 +61,9 @@ async function run() {
     assert.strictEqual(c.hasTacho, true);
     assert.ok(c.subjectTransporteur({ hour: "14", groupe: "MEHARIS TE" }).includes("MEHARIS TE"));
   });
-  check("FREINAGE config: no transporteur support, has tacho (anomaly rows, not the declared window)", () => {
+  check("FREINAGE config: supports transporteur (like every other report), has tacho (anomaly rows, not the declared window)", () => {
     const c = getReportConfig("FREINAGE");
-    assert.strictEqual(c.supportsTransporteur, false);
+    assert.strictEqual(c.supportsTransporteur, true);
     assert.strictEqual(c.hasTacho, true);
   });
 
@@ -457,13 +457,6 @@ async function run() {
     assert.strictEqual(subject, "RAPPORT DE DECONNEXION J-1 / STMF");
   });
 
-  await check("buildReport: FREINAGE rejects TRANSPORTEUR recipientType", async () => {
-    await assert.rejects(
-      buildReport({ reportType: "FREINAGE", recipientType: "TRANSPORTEUR", groupe: "X", records: [] }),
-      /does not support a TRANSPORTEUR recipient/
-    );
-  });
-
   await check("buildReport: 0 records, TEMM -> no-infraction body, no PDF, still xlsx attached", async () => {
     const { body, attachments } = await buildReport({
       reportType: "FREINAGE", recipientType: "TEMM", hour: "14", records: [],
@@ -473,19 +466,17 @@ async function run() {
     assert.strictEqual(attachments.length, 1);
   });
 
-  await check("buildReport: FREINAGE TEMM, 1 record -> personalized body naming the event and driver", async () => {
+  await check("buildReport: FREINAGE TEMM, 1 record -> generic body, no personalized event/driver text", async () => {
     const { body } = await buildReport({
       reportType: "FREINAGE", recipientType: "TEMM", hour: "14",
       records: [{ item: itemVitesse, screenshot: TINY_JPEG_BASE64 }],
       xlsxAttachment: null,
     });
-    assert.ok(body.includes("situation inquiétante"));
-    assert.ok(body.includes("Excès de vitesse"), "must name the specific event");
-    assert.ok(body.includes("NASRI TARIK"), "must name the specific driver");
-    assert.ok(body.includes("fournir des explications"));
+    assert.ok(body.includes("Veuillez trouver ci-dessous le rapport des Freinages excessifs"));
+    assert.ok(!body.includes("situation inquiétante"), "the personalized text belongs to the transporteur email, not TEMM");
   });
 
-  await check("buildReport: FREINAGE TEMM, 2 records -> falls back to the generic multi-record intro, no single driver named", async () => {
+  await check("buildReport: FREINAGE TEMM, 2 records -> same generic body regardless of record count", async () => {
     const { body } = await buildReport({
       reportType: "FREINAGE", recipientType: "TEMM", hour: "14",
       records: [
@@ -494,7 +485,34 @@ async function run() {
       ],
       xlsxAttachment: null,
     });
-    assert.ok(body.includes("Veuillez trouver ci-dessous"));
+    assert.ok(body.includes("Veuillez trouver ci-dessous le rapport des Freinages excessifs"));
+    assert.ok(!body.includes("situation inquiétante"));
+  });
+
+  await check("buildReport: FREINAGE TRANSPORTEUR, 1 record -> personalized body naming the event and driver", async () => {
+    const { subject, body } = await buildReport({
+      reportType: "FREINAGE", recipientType: "TRANSPORTEUR", groupe: "MEHARIS TE", hour: "14",
+      records: [{ item: itemVitesse, screenshot: TINY_JPEG_BASE64 }],
+      xlsxAttachment: null,
+    });
+    assert.ok(subject.includes("MEHARIS TE"));
+    assert.ok(body.includes("situation inquiétante"));
+    assert.ok(body.includes("Excès de vitesse"), "must name the specific event");
+    assert.ok(body.includes("NASRI TARIK"), "must name the specific driver");
+    assert.ok(body.includes("fournir des explications"));
+  });
+
+  await check("buildReport: FREINAGE TRANSPORTEUR, 2 records -> falls back to the generic per-transporteur intro, no single driver named", async () => {
+    const { body } = await buildReport({
+      reportType: "FREINAGE", recipientType: "TRANSPORTEUR", groupe: "MEHARIS TE", hour: "14",
+      records: [
+        { item: itemVitesse, screenshot: TINY_JPEG_BASE64 },
+        { item: { ...itemVitesse, Immatriculation: "X", Conducteur: "AUTRE CHAUFFEUR" }, screenshot: TINY_JPEG_BASE64 },
+      ],
+      xlsxAttachment: null,
+    });
+    assert.ok(body.includes("Veuillez trouver ci-dessous le rapport suivi des infractions"));
+    assert.ok(body.includes("MEHARIS TE"));
     assert.ok(!body.includes("situation inquiétante"));
   });
 
